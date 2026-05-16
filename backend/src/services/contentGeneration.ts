@@ -65,45 +65,71 @@ export class ContentGenerationService {
    * Kept for backwards compatibility if needed outside of cron jobs
    */
   async generateContent(options: ContentGenerationOptions): Promise<GeneratedContent> {
-    const p1 = await this.generatePhase1(options);
-    const p2 = await this.generatePhase2(options, p1);
-    return await this.generatePhase3(options, p2);
+    let state = await this.generatePhase0(options);
+    state = await this.generatePhase1(options, state);
+    state = await this.generatePhase2(options, state);
+    state = await this.generatePhase3(options, state);
+    state = await this.generatePhase4(options, state);
+    return await this.generatePhase5(options, state);
   }
 
   /**
-   * Phase 1: Research, Trend Analysis, Competitor Analysis
+   * Phase 0: Research (Gemini)
    */
-  async generatePhase1(options: ContentGenerationOptions): Promise<any> {
+  async generatePhase0(options: ContentGenerationOptions): Promise<any> {
     const { topic, researchDepth } = options;
-    logger.info(`[Phase 1] Research & Trend Analysis for: ${topic}`);
+    logger.info(`[Phase 0] Research for: ${topic}`);
+    const researchData = await this.researchAgent(topic, researchDepth);
+    return { researchData };
+  }
+
+  /**
+   * Phase 1: Trend & Competitor Analysis (MiniMax)
+   */
+  async generatePhase1(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
+    const { topic } = options;
+    logger.info(`[Phase 1] Trend & Competitor Analysis for: ${topic}`);
     
-    const [researchData, trendData, competitiveAnalysis] = await Promise.all([
-      this.researchAgent(topic, researchDepth),
+    const [trendData, competitiveAnalysis] = await Promise.all([
       this.trendAgent(topic),
       this.competitorAnalysisAgent(topic),
     ]);
 
     return {
-      researchData,
+      ...intermediateResult,
       trendData,
       competitiveAnalysis,
     };
   }
 
   /**
-   * Phase 2: SEO, Hook Generation, Content Writing
+   * Phase 2: SEO & Hooks (MiniMax)
    */
   async generatePhase2(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
-    const { topic, contentType, persona, outline, targetAudience, keywords } = options;
-    const { researchData, trendData, competitiveAnalysis } = intermediateResult;
+    const { topic, persona, keywords } = options;
+    const { researchData } = intermediateResult;
 
-    logger.info(`[Phase 2] SEO Optimization for: ${topic}`);
-    const seoData = await this.seoAgent(topic, keywords || [], researchData);
+    logger.info(`[Phase 2] SEO & Hooks for: ${topic}`);
+    const [seoData, hookSuggestions] = await Promise.all([
+      this.seoAgent(topic, keywords || [], researchData),
+      this.hookAgent(topic, researchData, persona)
+    ]);
 
-    logger.info(`[Phase 2] Hook Generation for: ${topic}`);
-    const hookSuggestions = await this.hookAgent(topic, researchData, persona);
+    return {
+      ...intermediateResult,
+      seoData,
+      hookSuggestions,
+    };
+  }
 
-    logger.info(`[Phase 2] Content Writing for: ${topic}`);
+  /**
+   * Phase 3: Content Writing (MiniMax)
+   */
+  async generatePhase3(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
+    const { topic, contentType, persona, outline, targetAudience } = options;
+    const { researchData, seoData, hookSuggestions } = intermediateResult;
+
+    logger.info(`[Phase 3] Content Writing for: ${topic}`);
     const draft = await this.writingAgent({
       topic, contentType, persona, outline, researchData, seoData,
       bestHook: hookSuggestions[0], targetAudience,
@@ -111,36 +137,45 @@ export class ContentGenerationService {
 
     return {
       ...intermediateResult,
-      seoData,
-      hookSuggestions,
       draft,
     };
   }
 
   /**
-   * Phase 3: Editing, Fact Checking, Visuals, Timing, Engagement
+   * Phase 4: Editing & Fact Checking (MiniMax)
    */
-  async generatePhase3(options: ContentGenerationOptions, intermediateResult: any): Promise<GeneratedContent> {
-    const { topic, contentType, persona, includeImages, targetAudience } = options;
-    const { researchData, seoData, hookSuggestions, draft, competitiveAnalysis } = intermediateResult;
+  async generatePhase4(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
+    const { topic, contentType } = options;
+    const { draft, seoData, researchData } = intermediateResult;
 
-    logger.info(`[Phase 3] Editing & Optimization for: ${topic}`);
+    logger.info(`[Phase 4] Editing & Fact Checking for: ${topic}`);
     const edited = await this.editingAgent(draft, contentType, seoData);
-
-    logger.info(`[Phase 3] Fact Checking for: ${topic}`);
     const verified = await this.factCheckAgent(edited, researchData.sources);
 
+    return {
+      ...intermediateResult,
+      verified,
+    };
+  }
+
+  /**
+   * Phase 5: Visuals, Timing, Engagement (Gemini + MiniMax)
+   */
+  async generatePhase5(options: ContentGenerationOptions, intermediateResult: any): Promise<GeneratedContent> {
+    const { topic, contentType, persona, includeImages, targetAudience } = options;
+    const { researchData, seoData, hookSuggestions, verified, competitiveAnalysis } = intermediateResult;
+
+    logger.info(`[Phase 5] Final optimizations for: ${topic}`);
+    
     let imagePrompts: string[] = [];
     if (includeImages) {
-      logger.info(`[Phase 3] Visual Content Generation for: ${topic}`);
       imagePrompts = await this.visualAgent(topic, verified.content, persona);
     }
 
-    logger.info(`[Phase 3] Timing Optimization for: ${topic}`);
-    const bestPostingTime = await this.timingAgent(targetAudience);
-
-    logger.info(`[Phase 3] Engagement Prediction for: ${topic}`);
-    const engagementData = await this.engagementPredictorAgent(verified.content, contentType, hookSuggestions);
+    const [bestPostingTime, engagementData] = await Promise.all([
+      this.timingAgent(targetAudience),
+      this.engagementPredictorAgent(verified.content, contentType, hookSuggestions)
+    ]);
 
     return {
       title: verified.title,

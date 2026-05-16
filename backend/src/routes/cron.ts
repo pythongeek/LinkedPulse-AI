@@ -37,20 +37,28 @@ router.get('/tick', async (req, res) => {
           const { options, userId } = payload;
           
           if (job.phase === 0) {
-            // Phase 1
-            const p1Result = await contentService.generatePhase1(options);
-            await JobService.progressToNextPhase(job.id, 1, p1Result);
-            return res.json({ message: 'Phase 1 complete', jobId: job.id, phase: 0 });
+            const p0Result = await contentService.generatePhase0(options);
+            await JobService.progressToNextPhase(job.id, 1, p0Result);
+            return res.json({ message: 'Phase 0 complete', jobId: job.id, phase: 0 });
           } else if (job.phase === 1) {
-            // Phase 2
-            const p2Result = await contentService.generatePhase2(options, job.intermediateResult);
-            await JobService.progressToNextPhase(job.id, 2, p2Result);
-            return res.json({ message: 'Phase 2 complete', jobId: job.id, phase: 1 });
+            const p1Result = await contentService.generatePhase1(options, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 2, p1Result);
+            return res.json({ message: 'Phase 1 complete', jobId: job.id, phase: 1 });
           } else if (job.phase === 2) {
-            // Phase 3 (Final)
-            const genResult = await contentService.generatePhase3(options, job.intermediateResult);
+            const p2Result = await contentService.generatePhase2(options, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 3, p2Result);
+            return res.json({ message: 'Phase 2 complete', jobId: job.id, phase: 2 });
+          } else if (job.phase === 3) {
+            const p3Result = await contentService.generatePhase3(options, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 4, p3Result);
+            return res.json({ message: 'Phase 3 complete', jobId: job.id, phase: 3 });
+          } else if (job.phase === 4) {
+            const p4Result = await contentService.generatePhase4(options, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 5, p4Result);
+            return res.json({ message: 'Phase 4 complete', jobId: job.id, phase: 4 });
+          } else if (job.phase === 5) {
+            const genResult = await contentService.generatePhase5(options, job.intermediateResult);
             
-            // Save to database
             const savedContent = await prisma.content.create({
               data: {
                 userId,
@@ -66,7 +74,6 @@ router.get('/tick', async (req, res) => {
               },
             });
 
-            // Update usage stats
             await prisma.usageStats.updateMany({
               where: { userId },
               data: { contentsGenerated: { increment: 1 } },

@@ -10,7 +10,7 @@ export class JobService {
   static async enqueue(type: JobType, payload: any, priority: number = 0): Promise<QueuedJob> {
     let totalPhases = 1;
     if (type === 'CONTENT_GENERATION') {
-      totalPhases = 3; // Research -> Writing -> Visuals/Timing
+      totalPhases = 6; // 0:Research, 1:Analysis, 2:SEO/Hooks, 3:Writing, 4:Editing, 5:Final
     }
 
     return prisma.queuedJob.create({
