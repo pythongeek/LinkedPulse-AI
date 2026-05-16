@@ -324,16 +324,16 @@ export default function ContentStudio() {
                   </div>
 
                   <Textarea
-                    value={generatedContent.content}
+                    value={generatedContent.body || generatedContent.content}
                     onChange={(e) =>
-                      setGeneratedContent({ ...generatedContent, content: e.target.value })
+                      setGeneratedContent({ ...generatedContent, body: e.target.value })
                     }
                     rows={12}
                     className="font-mono text-sm"
                   />
 
                   <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1" onClick={() => navigator.clipboard.writeText(generatedContent.content)}>
+                    <Button variant="outline" className="flex-1" onClick={() => navigator.clipboard.writeText(generatedContent.body || generatedContent.content)}>
                       Copy to Clipboard
                     </Button>
                     <Button className="flex-1">Save to Library</Button>
@@ -373,10 +373,13 @@ export default function ContentStudio() {
                   <Button 
                     className="w-full" 
                     disabled={!selectedHook}
-                    onClick={() => setGeneratedContent({
-                      ...generatedContent,
-                      content: selectedHook + '\n\n' + generatedContent.content.substring(generatedContent.content.indexOf('\n\n') + 2)
-                    })}
+                    onClick={() => {
+                      const text = generatedContent.body || generatedContent.content;
+                      setGeneratedContent({
+                        ...generatedContent,
+                        body: selectedHook + '\n\n' + text.substring(text.indexOf('\n\n') + 2)
+                      });
+                    }}
                     onClickCapture={() => setActiveTab('content')}
                   >
                     Apply Selected Hook

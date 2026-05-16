@@ -82,7 +82,7 @@ Your goal is to create authentic, valuable content that reflects your unique exp
    */
   static async generatePreview(persona: Persona, sampleTopic: string): Promise<string> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const prompt = `${persona.systemPrompt}
 
@@ -208,7 +208,7 @@ Make it engaging, authentic, and true to your voice. Include a hook and a call-t
     outline?: any
   ): Promise<{ content: string; imagePrompts: string[] }> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const contextWrapper = this.buildContextWrapper(persona, {
         contentType,

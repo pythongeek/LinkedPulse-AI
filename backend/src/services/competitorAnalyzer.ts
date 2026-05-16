@@ -78,7 +78,7 @@ export class CompetitorAnalyzer {
    */
   private async analyzeContentPatterns(posts: LinkedInPost[]): Promise<any> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const postsSample = posts.slice(0, 20).map((p) => p.content).join('\n\n---\n\n');
 
@@ -126,7 +126,7 @@ Return in JSON format.`;
    */
   async identifyGaps(posts: LinkedInPost[], topic?: string): Promise<string[]> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const postsSample = posts.slice(0, 30).map((p) => p.content).join('\n\n---\n\n');
 
@@ -169,7 +169,7 @@ Return a JSON array of gap descriptions.`;
     gaps: string[]
   ): Promise<string[]> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const prompt = `Based on these content gaps for "${topic}":
 
@@ -200,7 +200,7 @@ Return a JSON array of opportunity descriptions with specific angles.`;
    */
   async analyzeEngagementPatterns(posts: LinkedInPost[]): Promise<any> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const postsWithEngagement = posts
         .slice(0, 20)

@@ -82,7 +82,7 @@ export class ProfileWatchdogService {
    */
   private async checkOutdatedContent(user: any, audit: any): Promise<void> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const prompt = `Analyze this LinkedIn profile content for outdated information:
 
@@ -133,7 +133,7 @@ Return JSON array of outdated items with suggestions.`;
       const trends = await auditor.getIndustryTrends('general');
 
       // Compare with user's current profile
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const prompt = `Compare this LinkedIn profile with current industry trends:
 
@@ -177,7 +177,7 @@ Return JSON with recommendations.`;
       const topCreators = await new ProfileAuditor().getTopCreators('general');
 
       // Analyze gaps
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const prompt = `Compare this LinkedIn profile with top performers:
 

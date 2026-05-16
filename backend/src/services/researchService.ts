@@ -51,7 +51,7 @@ export class ResearchService {
    */
   async geminiSearch(query: string, limit: number = 10): Promise<ResearchResult[]> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const prompt = `Search for information about: "${query}"
 
@@ -124,7 +124,7 @@ Return in JSON format:
    */
   async extractFromUrl(url: string): Promise<any> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const prompt = `Extract key information from this URL: ${url}
 
@@ -158,7 +158,7 @@ Return in JSON format.`;
    */
   async summarizeFindings(results: ResearchResult[]): Promise<string> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const prompt = `Summarize these research findings into key insights:
 
