@@ -18,23 +18,11 @@ router.post('/run', authenticate, validateBody(profileAuditSchema), async (req, 
     const { linkedinUrl, industry, focusAreas } = req.body;
     const userId = req.user!.id;
 
-    // Get user's LinkedIn session
-    const session = await prisma.linkedInSession.findUnique({
-      where: { userId },
-    });
-
-    if (!session || !session.isActive) {
-      return res.status(400).json({
-        error: {
-          message: 'LinkedIn session required for profile audit',
-          code: 'NO_LINKEDIN_SESSION',
-        },
-      });
-    }
-
+    // For prototype phase, we bypass the actual LinkedIn session requirement
+    // since the scraper returns mock data.
     const cookies = {
-      liAt: session.liAt,
-      jsessionId: session.jsessionId,
+      liAt: 'mock_liAt',
+      jsessionId: 'mock_jsessionId',
     };
 
     // Scrape profile
