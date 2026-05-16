@@ -1,0 +1,123 @@
+import express from 'express';
+import { JobService } from '../services/jobService';
+import { logger } from '../utils/logger';
+import { ContentGenerationService } from '../services/contentGeneration';
+import { LinkedInScraper } from '../services/linkedinScraper';
+import { prisma } from '../server';
+
+const router = express.Router();
+
+router.get('/tick', async (req, res) => {
+  const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+  
+  if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
+    logger.warn('Unauthorized cron tick attempt');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const job = await JobService.getNextJob();
+    
+    if (!job) {
+      return res.json({ message: 'No pending jobs' });
+    }
+
+    // Mark as processing
+    await JobService.markAsProcessing(job.id);
+    logger.info(`Processing job ${job.id} (${job.type})`);
+
+    const payload = job.payload as any;
+
+    try {
+      let result;
+
+      switch (job.type) {
+        case 'CONTENT_GENERATION': {
+          const contentService = new ContentGenerationService();
+          const { options, userId } = payload;
+          
+          // Execute generation
+          const genResult = await contentService.generateContent(options);
+          
+          // Save to database (as done in the original route)
+          const savedContent = await prisma.content.create({
+            data: {
+              userId,
+              contentType: options.contentType,
+              title: genResult.title,
+              body: genResult.content,
+              outline: options.outline || genResult.outline,
+              researchData: genResult.researchData,
+              sources: genResult.sources,
+              images: genResult.images || [],
+              status: 'draft',
+              engagementPrediction: genResult.engagementPrediction,
+            },
+          });
+
+          // Update usage stats
+          await prisma.usageStats.updateMany({
+            where: { userId },
+            data: { contentsGenerated: { increment: 1 } },
+          });
+
+          result = { success: true, contentId: savedContent.id };
+          break;
+        }
+
+        case 'LINKEDIN_SCRAPE': {
+          const scraper = new LinkedInScraper();
+          const { topic, cookies, limit } = payload;
+          const posts = await scraper.scrapeTopicPosts(topic, cookies, limit);
+          result = { success: true, count: posts.length, posts };
+          break;
+        }
+
+        default:
+          throw new Error(`Unknown job type: ${job.type}`);
+      }
+
+      await JobService.updateJob(job.id, {
+        status: 'COMPLETED',
+        result,
+      });
+      
+      logger.info(`Job ${job.id} completed successfully`);
+    } catch (error) {
+      logger.error(`Job ${job.id} failed:`, error);
+      
+      const attempts = (job.attempts || 0) + 1;
+      const shouldRetry = attempts < (job.maxAttempts || 3);
+      
+      await JobService.updateJob(job.id, {
+        status: shouldRetry ? 'PENDING' : 'FAILED',
+        error: error instanceof Error ? error.message : String(error),
+        attempts,
+        // Exponential backoff or simple delay
+        runAt: shouldRetry ? new Date(Date.now() + 1000 * 60 * Math.pow(2, attempts)) : job.runAt,
+      });
+    }
+
+    res.json({ message: 'Tick processed', jobId: job.id });
+  } catch (error) {
+    logger.error('Cron tick error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Get job status (for frontend polling)
+ */
+router.get('/status/:id', async (req, res) => {
+  try {
+    const job = await JobService.getJob(req.params.id);
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    res.json({ job });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+export default router;

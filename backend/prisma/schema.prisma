@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String?
+  avatar        String?
+  linkedinCookies String?  @map("linkedin_cookies")
+  linkedinProfile Json?    @map("linkedin_profile")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  personas      Persona[]
+  contents      Content[]
+  audits        ProfileAudit[]
+  topicAlerts   TopicAlert[]
+  usageStats    UsageStats?
+  
+  @@map("users")
+}
+
+model Persona {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  name            String
+  jobRole         String   @map("job_role")
+  expertiseNodes  String[] @map("expertise_nodes")
+  experienceVault String   @map("experience_vault") @db.Text
+  tone            String
+  visualDNA       Json     @map("visual_dna")
+  systemPrompt    String   @map("system_prompt") @db.Text
+  isDefault       Boolean  @default(false) @map("is_default")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("personas")
+}
+
+model Topic {
+  id                String   @id @default(uuid())
+  keyword           String   @unique
+  opportunityScore  Float?   @map("opportunity_score")
+  trendData         Json?    @map("trend_data")
+  competitionData   Json?    @map("competition_data")
+  linkedinData      Json?    @map("linkedin_data")
+  lastAnalyzed      DateTime? @map("last_analyzed")
+  createdAt         DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  contents    Content[]
+  competitors CompetitorPost[]
+  
+  @@map("topics")
+}
+
+model Content {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  topicId           String?  @map("topic_id")
+  personaId         String?  @map("persona_id")
+  contentType       String   @map("content_type")
+  title             String?
+  body              String   @db.Text
+  outline           Json?
+  researchData      Json?    @map("research_data")
+  sources           Json?
+  images            String[]
+  status            String   @default("draft")
+  engagementPrediction Float? @map("engagement_prediction")
+  scheduledFor      DateTime? @map("scheduled_for")
+  publishedAt       DateTime? @map("published_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic   Topic?  @relation(fields: [topicId], references: [id])
+  
+  @@map("contents")
+}
+
+model CompetitorPost {
+  id          String   @id @default(uuid())
+  topicId     String   @map("topic_id")
+  author      String
+  authorProfile String? @map("author_profile")
+  content     String   @db.Text
+  likes       Int      @default(0)
+  comments    Int      @default(0)
+  shares      Int      @default(0)
+  postUrl     String?  @map("post_url")
+  postedAt    DateTime? @map("posted_at")
+  analyzedAt  DateTime @default(now()) @map("analyzed_at")
+  
+  // Relations
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  
+  @@map("competitor_posts")
+}
+
+model ProfileAudit {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  headline        String?
+  about           String?  @db.Text
+  bannerUrl       String?  @map("banner_url")
+  profileUrl      String?  @map("profile_url")
+  auditScore      Float?   @map("audit_score")
+  seoScore        Float?   @map("seo_score")
+  brandScore      Float?   @map("brand_score")
+  gaps            Json?
+  suggestions     Json?
+  topCreators     Json?    @map("top_creators")
+  industryTrends  Json?    @map("industry_trends")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("profile_audits")
+}
+
+model TopicAlert {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  topic       String
+  alertType   String   @map("alert_type")
+  message     String
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("topic_alerts")
+}
+
+model UsageStats {
+  id                  String   @id @default(uuid())
+  userId              String   @unique @map("user_id")
+  contentsGenerated   Int      @default(0) @map("contents_generated")
+  topicsResearched    Int      @default(0) @map("topics_researched")
+  imagesCreated       Int      @default(0) @map("images_created")
+  apiCalls            Int      @default(0) @map("api_calls")
+  lastReset           DateTime @default(now()) @map("last_reset")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("usage_stats")
+}
+
+model ResearchCache {
+  id          String   @id @default(uuid())
+  query       String
+  queryType   String   @map("query_type")
+  results     Json
+  source      String
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@index([query, queryType])
+  @@map("research_cache")
+}
+
+model ScrapingJob {
+  id          String   @id @default(uuid())
+  jobType     String   @map("job_type")
+  status      String   @default("pending")
+  params      Json
+  result      Json?
+  error       String?
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("scraping_jobs")
+}
+
+model LinkedInSession {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  liAt        String   @map("li_at")
+  jsessionId  String   @map("jsession_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  lastUsed    DateTime @default(now()) @map("last_used")
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("linkedin_sessions")
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model QueuedJob {
+  id                String    @id @default(uuid())
+  type              String    // e.g., "CONTENT_GENERATION", "TREND_ANALYSIS"
+  status            JobStatus @default(PENDING)
+  phase             Int       @default(0)    // Current phase (for chunked processing)
+  totalPhases       Int       @default(1)    // Total phases needed
+  payload           Json      // Input parameters
+  intermediateResult Json?    // Partial results between phases
+  result            Json?     // Final output result
+  error             String?   // Error message
+  attempts          Int       @default(0)
+  maxAttempts       Int       @default(3)
+  priority          Int       @default(0)
+  runAt             DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@map("queued_jobs")
+}

@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # Main API server
+  api:
+    container_name: linkedin-api
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.scraper
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_SEARCH_ENGINE_ID=${GOOGLE_SEARCH_ENGINE_ID}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - IMAGE_PROVIDER=${IMAGE_PROVIDER}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+    volumes:
+      - ../logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - linkedin-platform-network
+
+  # Redis for caching and queues
+  redis:
+    container_name: linkedin-redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - linkedin-redis-data:/data
+    restart: unless-stopped
+    networks:
+      - linkedin-platform-network
+
+  # Worker for background jobs
+  worker:
+    container_name: linkedin-worker
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    depends_on:
+      - redis
+      - api
+    restart: unless-stopped
+    networks:
+      - linkedin-platform-network
+
+  # Browser automation service
+  browser-automation:
+    container_name: linkedin-browser-automation
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.browser
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    ports:
+      - "3002:3002"
+    volumes:
+      - linkedin-browser-data:/app/data
+    restart: unless-stopped
+    networks:
+      - linkedin-platform-network
+    shm_size: '2gb'
+
+volumes:
+  linkedin-redis-data:
+  linkedin-browser-data:
+
+networks:
+  linkedin-platform-network:
+    driver: bridge

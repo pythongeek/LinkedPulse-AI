@@ -1,0 +1,27 @@
+FROM node:18-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY backend/package*.json ./
+
+# Install dependencies (without puppeteer for worker)
+RUN npm install --omit=optional
+
+# Copy source code
+COPY backend/src ./src
+COPY backend/prisma ./prisma
+COPY backend/tsconfig.json ./
+COPY workers ./workers
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build TypeScript
+RUN npm run build
+
+# Create logs directory
+RUN mkdir -p logs
+
+# Start the worker
+CMD ["node", "workers/jobProcessor.js"]
