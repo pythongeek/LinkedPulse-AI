@@ -66,7 +66,7 @@ export class MiniMaxClient {
         throw new Error(`MiniMax API error: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as any;
       return data.choices?.[0]?.message?.content || '';
     } catch (error) {
       logger.error('MiniMax chat error:', error);

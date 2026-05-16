@@ -45,16 +45,6 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       });
     }
 
-    // DEMO TOKEN BYPASS
-    if (token === 'demo-token') {
-      req.user = {
-        id: 'demo-user-id',
-        email: 'demo@example.com',
-        name: 'Demo User',
-      };
-      return next();
-    }
-
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
 
@@ -74,7 +64,11 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     // Attach user to request
-    req.user = user;
+    req.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name ?? undefined,
+    };
     next();
   } catch (error) {
     logger.error('Auth middleware error:', error);
@@ -118,7 +112,11 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
     });
 
     if (user) {
-      req.user = user;
+      req.user = {
+        id: user.id,
+        email: user.email,
+        name: user.name ?? undefined,
+      };
     }
 
     next();

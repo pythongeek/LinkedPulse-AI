@@ -49,7 +49,7 @@ export class JobService {
   static async updateJob(id: string, data: Partial<QueuedJob>): Promise<QueuedJob> {
     return prisma.queuedJob.update({
       where: { id },
-      data,
+      data: data as any,
     });
   }
 

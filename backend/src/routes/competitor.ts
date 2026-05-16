@@ -107,7 +107,14 @@ router.get('/gaps/:topic', authenticate, async (req, res) => {
     }
 
     const analyzer = new CompetitorAnalyzer();
-    const gaps = await analyzer.identifyGaps(topicRecord.competitors, topic);
+    // map Prisma type to LinkedInPost interface
+    const mappedCompetitors = topicRecord.competitors.map(c => ({
+      ...c,
+      authorProfile: c.authorProfile ?? undefined,
+      postUrl: c.postUrl ?? undefined,
+      timestamp: c.postedAt?.toISOString(),
+    }));
+    const gaps = await analyzer.identifyGaps(mappedCompetitors, topic);
 
     res.json({ gaps });
   } catch (error) {

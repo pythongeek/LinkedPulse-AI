@@ -88,7 +88,7 @@ router.get('/tick', async (req, res) => {
           const scraper = new LinkedInScraper();
           const { topic, cookies, limit } = payload;
           const posts = await scraper.scrapeTopicPosts(topic, cookies, limit);
-          result = { success: true, count: posts.length, posts };
+          result = { success: true, count: posts.length, posts: posts as any };
           break;
         }
 
@@ -98,7 +98,7 @@ router.get('/tick', async (req, res) => {
 
       await JobService.updateJob(job.id, {
         status: 'COMPLETED',
-        result,
+        result: result as any,
       });
       
       logger.info(`Job ${job.id} completed successfully`);
