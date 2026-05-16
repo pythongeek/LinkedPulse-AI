@@ -63,14 +63,14 @@ export default function Personas() {
                 <div>
                   <p className="text-sm font-medium mb-2">Expertise</p>
                   <div className="flex flex-wrap gap-1">
-                    {persona.expertiseNodes.slice(0, 3).map((node: string) => (
+                    {(persona.expertiseNodes || []).slice(0, 3).map((node: string) => (
                       <Badge key={node} variant="secondary" className="text-xs">
                         {node}
                       </Badge>
                     ))}
-                    {persona.expertiseNodes.length > 3 && (
+                    {(persona.expertiseNodes || []).length > 3 && (
                       <Badge variant="secondary" className="text-xs">
-                        +{persona.expertiseNodes.length - 3}
+                        +{(persona.expertiseNodes || []).length - 3}
                       </Badge>
                     )}
                   </div>
