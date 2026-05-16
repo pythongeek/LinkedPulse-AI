@@ -206,7 +206,7 @@ export class ContentGenerationService {
    */
   private async researchAgent(topic: string, depth: 'quick' | 'deep'): Promise<any> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
       const prompt = `Research the topic: "${topic}" thoroughly for LinkedIn content.
 
@@ -376,14 +376,16 @@ ${this.getContentTypeRequirements(contentType)}
 Return JSON:
 {
   "title": "Compelling title",
-  "content": "Full content with hook as first line",
-  "outline": {"sections": [...]},
-  "formattedContent": "Content with **bold** formatting"
+  "content": "Full content with hook as first line"
 }`,
-        { temperature: 0.8, maxTokens: 4096 }
+        { temperature: 0.8, maxTokens: 1000 }
       );
 
-      return result;
+      return {
+        ...result,
+        outline: outline || { sections: [] },
+        formattedContent: result.content
+      };
     } catch (error) {
       logger.error('Writing agent error:', error);
       return { title: topic, content: 'Error generating content.', outline: {}, formattedContent: '' };
@@ -410,13 +412,11 @@ Tasks:
 
 Return JSON:
 {
-  "content": "Edited content",
-  "formattedContent": "Content with **bold** formatting",
-  "improvements": ["..."]
+  "content": "Edited content"
 }`
       );
 
-      return { ...draft, ...result };
+      return { ...draft, ...result, formattedContent: result.content };
     } catch (error) {
       logger.error('Editing agent error:', error);
       return draft;
@@ -438,15 +438,12 @@ SOURCES: ${JSON.stringify(sources?.slice(0, 5))}
 
 Return JSON:
 {
-  "verified": true/false,
-  "content": "Updated content with verified claims",
-  "title": "${content.title}",
-  "outline": ${JSON.stringify(content.outline || {})},
-  "formattedContent": "${content.formattedContent || ''}"
+  "verified": true,
+  "content": "Updated content with verified claims"
 }`
       );
 
-      return { ...content, ...result, sources };
+      return { ...content, ...result, sources, formattedContent: result.content };
     } catch (error) {
       logger.error('Fact check agent error:', error);
       return { ...content, verified: false, sources };
@@ -458,7 +455,7 @@ Return JSON:
    */
   private async visualAgent(topic: string, content: string, persona?: Persona | null): Promise<string[]> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
       const visualDNA = persona?.visualDNA as any;
       const visualStyle = visualDNA?.style ? `Style: ${visualDNA.style}, Colors: ${visualDNA.colorScheme}` : 'Professional, clean LinkedIn imagery';
