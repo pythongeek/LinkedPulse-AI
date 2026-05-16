@@ -35,6 +35,9 @@ export default function ContentStudio() {
   const [selectedHook, setSelectedHook] = useState<string>('');
   const [activeTab, setActiveTab] = useState('content');
 
+  const [jobPhase, setJobPhase] = useState<number>(0);
+  const [jobTotalPhases, setJobTotalPhases] = useState<number>(1);
+
   const { data: personas } = useQuery({
     queryKey: ['personas'],
     queryFn: () => personaApi.getAll().then((res) => res.data.personas),
@@ -51,6 +54,8 @@ export default function ContentStudio() {
         const res = await jobApi.getStatus(jobId);
         const job = res.data.job;
         setJobStatus(job.status);
+        if (job.phase !== undefined) setJobPhase(job.phase);
+        if (job.totalPhases !== undefined) setJobTotalPhases(job.totalPhases);
         
         if (job.status === 'COMPLETED') {
           const contentId = job.result?.contentId;
@@ -234,7 +239,11 @@ export default function ContentStudio() {
               {isGenerating || generateMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating with AI Agents...
+                  {jobId ? (
+                    `Generating Phase ${jobPhase + 1} of ${jobTotalPhases}...`
+                  ) : (
+                    'Starting Generation...'
+                  )}
                 </>
               ) : (
                 <>

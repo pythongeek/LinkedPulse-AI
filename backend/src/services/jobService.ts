@@ -8,12 +8,19 @@ export class JobService {
    * Enqueue a new job
    */
   static async enqueue(type: JobType, payload: any, priority: number = 0): Promise<QueuedJob> {
+    let totalPhases = 1;
+    if (type === 'CONTENT_GENERATION') {
+      totalPhases = 3; // Research -> Writing -> Visuals/Timing
+    }
+
     return prisma.queuedJob.create({
       data: {
         type,
         payload,
         priority,
         status: 'PENDING',
+        totalPhases,
+        phase: 0,
       },
     });
   }
@@ -57,6 +64,22 @@ export class JobService {
         attempts: {
           increment: 1,
         },
+      },
+    });
+  }
+
+  /**
+   * Progress a multi-phase job to the next phase
+   */
+  static async progressToNextPhase(id: string, nextPhase: number, intermediateResult: any): Promise<QueuedJob> {
+    return prisma.queuedJob.update({
+      where: { id },
+      data: {
+        phase: nextPhase,
+        intermediateResult,
+        status: 'PENDING',
+        attempts: 0, // Reset attempts for the new phase
+        runAt: new Date(), // Run immediately on next tick
       },
     });
   }

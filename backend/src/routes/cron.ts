@@ -36,32 +36,44 @@ router.get('/tick', async (req, res) => {
           const contentService = new ContentGenerationService();
           const { options, userId } = payload;
           
-          // Execute generation
-          const genResult = await contentService.generateContent(options);
-          
-          // Save to database (as done in the original route)
-          const savedContent = await prisma.content.create({
-            data: {
-              userId,
-              contentType: options.contentType,
-              title: genResult.title,
-              body: genResult.content,
-              outline: options.outline || genResult.outline,
-              researchData: genResult.researchData,
-              sources: genResult.sources,
-              images: genResult.images || [],
-              status: 'draft',
-              engagementPrediction: genResult.engagementPrediction,
-            },
-          });
+          if (job.phase === 0) {
+            // Phase 1
+            const p1Result = await contentService.generatePhase1(options);
+            await JobService.progressToNextPhase(job.id, 1, p1Result);
+            return res.json({ message: 'Phase 1 complete', jobId: job.id, phase: 0 });
+          } else if (job.phase === 1) {
+            // Phase 2
+            const p2Result = await contentService.generatePhase2(options, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 2, p2Result);
+            return res.json({ message: 'Phase 2 complete', jobId: job.id, phase: 1 });
+          } else if (job.phase === 2) {
+            // Phase 3 (Final)
+            const genResult = await contentService.generatePhase3(options, job.intermediateResult);
+            
+            // Save to database
+            const savedContent = await prisma.content.create({
+              data: {
+                userId,
+                contentType: options.contentType,
+                title: genResult.title,
+                body: genResult.content,
+                outline: options.outline || genResult.outline,
+                researchData: genResult.researchData,
+                sources: genResult.sources,
+                images: genResult.images || [],
+                status: 'draft',
+                engagementPrediction: genResult.engagementPrediction,
+              },
+            });
 
-          // Update usage stats
-          await prisma.usageStats.updateMany({
-            where: { userId },
-            data: { contentsGenerated: { increment: 1 } },
-          });
+            // Update usage stats
+            await prisma.usageStats.updateMany({
+              where: { userId },
+              data: { contentsGenerated: { increment: 1 } },
+            });
 
-          result = { success: true, contentId: savedContent.id };
+            result = { success: true, contentId: savedContent.id };
+          }
           break;
         }
 

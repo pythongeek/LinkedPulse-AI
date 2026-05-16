@@ -62,80 +62,106 @@ export class ContentGenerationService {
 
   /**
    * Main content generation — orchestrates all agents
+   * Kept for backwards compatibility if needed outside of cron jobs
    */
   async generateContent(options: ContentGenerationOptions): Promise<GeneratedContent> {
-    const { topic, contentType, persona, outline, researchDepth, includeImages, targetAudience, keywords } = options;
+    const p1 = await this.generatePhase1(options);
+    const p2 = await this.generatePhase2(options, p1);
+    return await this.generatePhase3(options, p2);
+  }
 
-    try {
-      // Phase 1: Research (Gemini for grounding) + Trend Analysis (MiniMax)
-      logger.info(`[Phase 1] Research & Trend Analysis for: ${topic}`);
-      const [researchData, trendData, competitiveAnalysis] = await Promise.all([
-        this.researchAgent(topic, researchDepth),
-        this.trendAgent(topic),
-        this.competitorAnalysisAgent(topic),
-      ]);
+  /**
+   * Phase 1: Research, Trend Analysis, Competitor Analysis
+   */
+  async generatePhase1(options: ContentGenerationOptions): Promise<any> {
+    const { topic, researchDepth } = options;
+    logger.info(`[Phase 1] Research & Trend Analysis for: ${topic}`);
+    
+    const [researchData, trendData, competitiveAnalysis] = await Promise.all([
+      this.researchAgent(topic, researchDepth),
+      this.trendAgent(topic),
+      this.competitorAnalysisAgent(topic),
+    ]);
 
-      // Phase 2: SEO & Keywords (MiniMax)
-      logger.info(`[Phase 2] SEO Optimization`);
-      const seoData = await this.seoAgent(topic, keywords || [], researchData);
+    return {
+      researchData,
+      trendData,
+      competitiveAnalysis,
+    };
+  }
 
-      // Phase 3: Hook Generation (MiniMax)
-      logger.info(`[Phase 3] Hook Generation`);
-      const hookSuggestions = await this.hookAgent(topic, researchData, persona);
+  /**
+   * Phase 2: SEO, Hook Generation, Content Writing
+   */
+  async generatePhase2(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
+    const { topic, contentType, persona, outline, targetAudience, keywords } = options;
+    const { researchData, trendData, competitiveAnalysis } = intermediateResult;
 
-      // Phase 4: Content Writing (MiniMax — main agent)
-      logger.info(`[Phase 4] Content Writing`);
-      const draft = await this.writingAgent({
-        topic, contentType, persona, outline, researchData, seoData,
-        bestHook: hookSuggestions[0], targetAudience,
-      });
+    logger.info(`[Phase 2] SEO Optimization for: ${topic}`);
+    const seoData = await this.seoAgent(topic, keywords || [], researchData);
 
-      // Phase 5: Editing (MiniMax)
-      logger.info(`[Phase 5] Editing & Optimization`);
-      const edited = await this.editingAgent(draft, contentType, seoData);
+    logger.info(`[Phase 2] Hook Generation for: ${topic}`);
+    const hookSuggestions = await this.hookAgent(topic, researchData, persona);
 
-      // Phase 6: Fact Checking (MiniMax)
-      logger.info(`[Phase 6] Fact Checking`);
-      const verified = await this.factCheckAgent(edited, researchData.sources);
+    logger.info(`[Phase 2] Content Writing for: ${topic}`);
+    const draft = await this.writingAgent({
+      topic, contentType, persona, outline, researchData, seoData,
+      bestHook: hookSuggestions[0], targetAudience,
+    });
 
-      // Phase 7: Visual (Gemini — visual tasks)
-      let imagePrompts: string[] = [];
-      if (includeImages) {
-        logger.info(`[Phase 7] Visual Content Generation`);
-        imagePrompts = await this.visualAgent(topic, verified.content, persona);
-      }
+    return {
+      ...intermediateResult,
+      seoData,
+      hookSuggestions,
+      draft,
+    };
+  }
 
-      // Phase 8: Timing (MiniMax)
-      logger.info(`[Phase 8] Timing Optimization`);
-      const bestPostingTime = await this.timingAgent(targetAudience);
+  /**
+   * Phase 3: Editing, Fact Checking, Visuals, Timing, Engagement
+   */
+  async generatePhase3(options: ContentGenerationOptions, intermediateResult: any): Promise<GeneratedContent> {
+    const { topic, contentType, persona, includeImages, targetAudience } = options;
+    const { researchData, seoData, hookSuggestions, draft, competitiveAnalysis } = intermediateResult;
 
-      // Phase 9: Engagement Prediction (MiniMax)
-      const engagementData = await this.engagementPredictorAgent(verified.content, contentType, hookSuggestions);
+    logger.info(`[Phase 3] Editing & Optimization for: ${topic}`);
+    const edited = await this.editingAgent(draft, contentType, seoData);
 
-      return {
-        title: verified.title,
-        content: verified.content,
-        outline: verified.outline,
-        researchData,
-        sources: verified.sources,
-        images: [],
-        imagePrompts,
-        engagementPrediction: engagementData.score,
-        seoScore: seoData.seoScore || seoData.score || 50,
-        hookSuggestions,
-        bestPostingTime,
-        linkedinOptimization: {
-          hashtags: seoData.hashtags,
-          keywords: seoData.keywords,
-          mentions: seoData.mentions,
-          formattedContent: verified.formattedContent,
-        },
-        competitiveAnalysis,
-      };
-    } catch (error) {
-      logger.error('Content generation error:', error);
-      throw error;
+    logger.info(`[Phase 3] Fact Checking for: ${topic}`);
+    const verified = await this.factCheckAgent(edited, researchData.sources);
+
+    let imagePrompts: string[] = [];
+    if (includeImages) {
+      logger.info(`[Phase 3] Visual Content Generation for: ${topic}`);
+      imagePrompts = await this.visualAgent(topic, verified.content, persona);
     }
+
+    logger.info(`[Phase 3] Timing Optimization for: ${topic}`);
+    const bestPostingTime = await this.timingAgent(targetAudience);
+
+    logger.info(`[Phase 3] Engagement Prediction for: ${topic}`);
+    const engagementData = await this.engagementPredictorAgent(verified.content, contentType, hookSuggestions);
+
+    return {
+      title: verified.title,
+      content: verified.content,
+      outline: verified.outline,
+      researchData,
+      sources: verified.sources,
+      images: [],
+      imagePrompts,
+      engagementPrediction: engagementData.score,
+      seoScore: seoData.seoScore || seoData.score || 50,
+      hookSuggestions,
+      bestPostingTime,
+      linkedinOptimization: {
+        hashtags: seoData.hashtags,
+        keywords: seoData.keywords,
+        mentions: seoData.mentions,
+        formattedContent: verified.formattedContent,
+      },
+      competitiveAnalysis,
+    };
   }
 
   // ==================== AGENTS ====================
