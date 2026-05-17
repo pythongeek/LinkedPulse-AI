@@ -10,14 +10,14 @@ import { logger } from '../utils/logger';
 export interface LinkedInPost {
   id: string;
   author: string;
-  authorProfile?: string;
-  authorTitle?: string;
+  authorProfile?: string | null;
+  authorTitle?: string | null;
   content: string;
   likes: number;
   comments: number;
   shares: number;
-  timestamp?: string;
-  postUrl?: string;
+  timestamp?: string | null;
+  postUrl?: string | null;
   mediaUrls?: string[];
 }
 

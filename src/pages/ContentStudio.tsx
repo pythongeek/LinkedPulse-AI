@@ -37,6 +37,7 @@ export default function ContentStudio() {
 
   const [jobPhase, setJobPhase] = useState<number>(0);
   const [jobTotalPhases, setJobTotalPhases] = useState<number>(1);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const { data: personas } = useQuery({
     queryKey: ['personas'],
@@ -114,6 +115,25 @@ export default function ContentStudio() {
       targetAudience: targetAudience || undefined,
       includeImages,
     });
+  };
+
+  const handlePublish = async () => {
+    if (!generatedContent?.id) {
+      toast.error('No content ID found to publish');
+      return;
+    }
+    
+    setIsPublishing(true);
+    try {
+      await contentApi.publish(generatedContent.id);
+      toast.success('Successfully published to LinkedIn!');
+      // Update local status
+      setGeneratedContent({ ...generatedContent, status: 'published' });
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to publish to LinkedIn');
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleRegenerateHook = () => {
@@ -336,7 +356,20 @@ export default function ContentStudio() {
                     <Button variant="outline" className="flex-1" onClick={() => navigator.clipboard.writeText(generatedContent.body || generatedContent.content)}>
                       Copy to Clipboard
                     </Button>
-                    <Button className="flex-1">Save to Library</Button>
+                    <Button variant="secondary" className="flex-1">Save to Library</Button>
+                    <Button 
+                      className="flex-1 bg-[#0a66c2] hover:bg-[#004182] text-white" 
+                      onClick={handlePublish}
+                      disabled={isPublishing || generatedContent.status === 'published'}
+                    >
+                      {isPublishing ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</>
+                      ) : generatedContent.status === 'published' ? (
+                        'Published ✓'
+                      ) : (
+                        'Publish to LinkedIn'
+                      )}
+                    </Button>
                   </div>
                 </TabsContent>
 

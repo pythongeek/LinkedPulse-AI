@@ -10,7 +10,7 @@ declare global {
       user?: {
         id: string;
         email: string;
-        name?: string;
+        name?: string | null;
       };
     }
   }
@@ -43,16 +43,6 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
           code: 'UNAUTHORIZED',
         },
       });
-    }
-
-    // DEMO TOKEN BYPASS
-    if (token === 'demo-token') {
-      req.user = {
-        id: 'demo-user-id',
-        email: 'demo@example.com',
-        name: 'Demo User',
-      };
-      return next();
     }
 
     // Verify token

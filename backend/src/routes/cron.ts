@@ -98,7 +98,7 @@ router.get('/tick', async (req, res) => {
 
       await JobService.updateJob(job.id, {
         status: 'COMPLETED',
-        result,
+        result: result as any,
       });
       
       logger.info(`Job ${job.id} completed successfully`);

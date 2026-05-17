@@ -1,4 +1,4 @@
-import { MiniMaxClient } from './minimax';
+import { AIClient } from './minimax';
 import { logger } from '../utils/logger';
 
 export interface TrendData {
@@ -32,14 +32,16 @@ export interface OpportunityScore {
 }
 
 /**
- * TrendAnalyzer — powered by MiniMax M2.7
- * Replaced google-trends-api (broken npm package) with AI-powered analysis.
+ * TrendAnalyzer — powered by Gemini
+ * Uses AI with grounded knowledge to analyze LinkedIn content trends.
+ * NOTE: Results are AI-estimated, not real-time search data.
+ * For real-time data, integrate SerpApi or Google Trends API.
  */
 export class TrendAnalyzer {
-  private minimax: MiniMaxClient;
+  private ai: AIClient;
 
   constructor() {
-    this.minimax = new MiniMaxClient();
+    this.ai = new AIClient();
   }
 
   /**
@@ -62,7 +64,7 @@ export class TrendAnalyzer {
   }
 
   /**
-   * Get trend data for a single keyword using MiniMax
+   * Get trend data for a single keyword using Gemini
    */
   async getTrendData(
     keyword: string,
@@ -70,9 +72,11 @@ export class TrendAnalyzer {
     geo: string = 'US'
   ): Promise<TrendData> {
     try {
-      const result = await this.minimax.promptJSON(
-        'You are a trend analysis expert. Provide realistic trend data based on your knowledge. Always return valid JSON.',
-        `Analyze the trend for "${keyword}" in the ${geo} region over the ${timeframe} timeframe for LinkedIn content.
+      const result = await this.ai.promptJSON(
+        'You are a LinkedIn content trend analyst. Based on your training knowledge, provide your best assessment of actual market trends. Be honest about what you know vs. estimate. Always return valid JSON.',
+        `Analyze the LinkedIn content trend for "${keyword}" in the ${geo} region over the ${timeframe} timeframe.
+
+Based on your knowledge of this topic's real-world popularity, engagement patterns, and LinkedIn relevance, provide:
 
 Return JSON:
 {
@@ -83,7 +87,9 @@ Return JSON:
   },
   "regionalInterest": [{"region": "California", "value": 100}],
   "trendScore": 0-100
-}`
+}
+
+IMPORTANT: Base your estimates on real industry knowledge, not random numbers. If you're uncertain, use moderate values and fewer data points.`
       );
 
       return {
@@ -106,12 +112,12 @@ Return JSON:
   }
 
   /**
-   * Get trending topics using MiniMax
+   * Get trending topics using Gemini
    */
   async getTrendingTopics(category: string = 'business', limit: number = 10): Promise<any[]> {
     try {
-      const result = await this.minimax.promptJSON(
-        'You are a LinkedIn trend expert. Return trending topics as a JSON array.',
+      const result = await this.ai.promptJSON(
+        'You are a LinkedIn trend expert. Return trending topics as a JSON array based on your real knowledge of current industry trends.',
         `List the top ${limit} trending topics on LinkedIn in the "${category}" category right now.
 
 For each topic, provide:
@@ -135,7 +141,7 @@ Return as a JSON array.`
    */
   async compareTopics(topics: string[]): Promise<any> {
     try {
-      const result = await this.minimax.promptJSON(
+      const result = await this.ai.promptJSON(
         'You are a trend comparison expert. Return comparison data as JSON array.',
         `Compare these topics for LinkedIn content potential: ${topics.join(', ')}
 

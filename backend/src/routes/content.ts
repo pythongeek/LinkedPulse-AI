@@ -357,4 +357,89 @@ router.get('/:id/export', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * Publish content to LinkedIn
+ * POST /api/content/:id/publish
+ */
+router.post('/:id/publish', authenticate, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    const userId = req.user!.id;
+
+    const content = await prisma.content.findFirst({
+      where: { id, userId },
+    });
+
+    if (!content) {
+      return res.status(404).json({
+        error: {
+          message: 'Content not found',
+          code: 'NOT_FOUND',
+        },
+      });
+    }
+
+    // Determine the text to publish
+    const textToPublish = content.body || (content as any).content;
+    if (!textToPublish) {
+      return res.status(400).json({
+        error: {
+          message: 'Content body is empty',
+          code: 'BAD_REQUEST',
+        },
+      });
+    }
+
+    // 1. Try to get token from DB (if OAuth is implemented)
+    // 2. Fall back to environment variable for single-tenant / admin setup
+    let accessToken = process.env.LINKEDIN_ACCESS_TOKEN;
+    
+    // We check the DB for a session, but typically liAt is for scraping, not API. 
+    // If you add OAuth later, you'd store the OAuth token in a field like 'accessToken'.
+    const session = await prisma.linkedInSession.findUnique({ where: { userId } });
+    if (session && (session as any).accessToken) {
+       accessToken = (session as any).accessToken;
+    }
+
+    if (!accessToken) {
+      return res.status(401).json({
+        error: {
+          message: 'LinkedIn API access token not configured in environment or session.',
+          code: 'LINKEDIN_UNAUTHORIZED',
+        },
+      });
+    }
+
+    // Import dynamically to avoid circular dependencies if any
+    const { LinkedInPublisher } = await import('../services/linkedinPublisher');
+    
+    const postUrn = await LinkedInPublisher.publishText(textToPublish, accessToken);
+
+    // Update content status
+    const updatedContent = await prisma.content.update({
+      where: { id },
+      data: {
+        status: 'published',
+        publishedAt: new Date(),
+      },
+    });
+
+    logger.info(`Content published to LinkedIn: ${id} (URN: ${postUrn})`);
+
+    res.json({
+      message: 'Successfully published to LinkedIn',
+      postUrn,
+      content: updatedContent,
+    });
+  } catch (error: any) {
+    logger.error('Publish content error:', error);
+    res.status(500).json({
+      error: {
+        message: error.message || 'Failed to publish content to LinkedIn',
+        code: 'PUBLISH_ERROR',
+      },
+    });
+  }
+});
+
 export default router;

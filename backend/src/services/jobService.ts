@@ -46,7 +46,7 @@ export class JobService {
   /**
    * Update job status and results
    */
-  static async updateJob(id: string, data: Partial<QueuedJob>): Promise<QueuedJob> {
+  static async updateJob(id: string, data: Record<string, any>): Promise<QueuedJob> {
     return prisma.queuedJob.update({
       where: { id },
       data,

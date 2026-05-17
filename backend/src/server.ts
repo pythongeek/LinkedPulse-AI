@@ -38,8 +38,8 @@ export const prisma =
   });
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-// Redis stub (removed — Vercel has no Redis)
-export const redis = null;
+
+
 
 // Security middleware
 app.use(helmet({
@@ -79,7 +79,6 @@ app.get('/api/health', (req, res) => {
     version: '1.0.0',
     services: {
       database: 'connected',
-      redis: 'not-configured',
     },
   });
 });

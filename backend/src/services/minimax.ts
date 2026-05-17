@@ -1,8 +1,8 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../utils/logger';
 
-const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || '';
-const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || 'https://api.minimax.io/v1';
-const MINIMAX_MODEL = process.env.MINIMAX_MODEL || 'MiniMax-M2.7';
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-pro';
 
 export interface MiniMaxMessage {
   role: 'system' | 'user' | 'assistant';
@@ -16,18 +16,15 @@ export interface MiniMaxOptions {
 }
 
 /**
- * MiniMax AI Client — OpenAI-compatible API
- * Main agent for content planning, writing, engagement, analysis.
+ * AI Client — Gemini-backed
+ * Replaced MiniMax M2.7 with Gemini to consolidate on a single AI provider.
+ * Keeps the same API surface for backwards compatibility.
  */
-export class MiniMaxClient {
-  private apiKey: string;
-  private baseUrl: string;
+export class AIClient {
   private model: string;
 
   constructor() {
-    this.apiKey = MINIMAX_API_KEY;
-    this.baseUrl = MINIMAX_BASE_URL;
-    this.model = MINIMAX_MODEL;
+    this.model = GEMINI_MODEL;
   }
 
   /**
@@ -37,45 +34,49 @@ export class MiniMaxClient {
     messages: MiniMaxMessage[],
     options: MiniMaxOptions = {}
   ): Promise<string> {
-    const { temperature = 0.7, maxTokens = 4096, stream = false } = options;
+    const { temperature = 0.7, maxTokens = 4096 } = options;
 
-    if (!this.apiKey) {
-      logger.error('MINIMAX_API_KEY not configured');
-      throw new Error('MiniMax API key not configured');
+    if (!process.env.GEMINI_API_KEY) {
+      logger.error('GEMINI_API_KEY not configured');
+      throw new Error('Gemini API key not configured');
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages,
+      const model = genAI.getGenerativeModel({
+        model: this.model,
+        generationConfig: {
           temperature,
-          max_tokens: maxTokens,
-          stream,
-        }),
+          maxOutputTokens: maxTokens,
+        },
       });
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        logger.error(`MiniMax API error ${response.status}: ${errorBody}`);
-        throw new Error(`MiniMax API error: ${response.status}`);
+      // Convert messages: Gemini doesn't have a system role in the same way.
+      // Prepend system message to the first user message.
+      let systemPrompt = '';
+      const geminiParts: string[] = [];
+
+      for (const msg of messages) {
+        if (msg.role === 'system') {
+          systemPrompt = msg.content;
+        } else {
+          geminiParts.push(msg.content);
+        }
       }
 
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || '';
+      const combinedPrompt = systemPrompt
+        ? `${systemPrompt}\n\n${geminiParts.join('\n\n')}`
+        : geminiParts.join('\n\n');
+
+      const result = await model.generateContent(combinedPrompt);
+      return result.response.text();
     } catch (error) {
-      logger.error('MiniMax chat error:', error);
+      logger.error('AI chat error:', error);
       throw error;
     }
   }
 
   /**
-   * Generate JSON response — parses JSON from MiniMax output
+   * Generate JSON response — parses JSON from AI output
    */
   async chatJSON<T = any>(
     messages: MiniMaxMessage[],
@@ -83,18 +84,30 @@ export class MiniMaxClient {
   ): Promise<T> {
     const text = await this.chat(messages, options);
 
+    // Strip markdown fences
+    let cleanText = text.trim();
+    if (cleanText.startsWith('```json')) {
+      cleanText = cleanText.substring(7);
+    } else if (cleanText.startsWith('```')) {
+      cleanText = cleanText.substring(3);
+    }
+    if (cleanText.endsWith('```')) {
+      cleanText = cleanText.substring(0, cleanText.length - 3);
+    }
+    cleanText = cleanText.trim();
+
     // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[0]);
       } catch {
-        logger.warn('Failed to parse MiniMax JSON response, returning raw text');
+        logger.warn('Failed to parse AI JSON response, trying array match');
       }
     }
 
     // Try array match
-    const arrayMatch = text.match(/\[[\s\S]*\]/);
+    const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
     if (arrayMatch) {
       try {
         return JSON.parse(arrayMatch[0]);
@@ -103,7 +116,7 @@ export class MiniMaxClient {
       }
     }
 
-    throw new Error('MiniMax did not return valid JSON');
+    throw new Error('AI did not return valid JSON');
   }
 
   /**
@@ -126,3 +139,6 @@ export class MiniMaxClient {
     ], options);
   }
 }
+
+// Backwards-compatible alias — all existing imports continue working
+export { AIClient as MiniMaxClient };

@@ -45,6 +45,7 @@ export const contentApi = {
   update: (id: string, data: any) => api.put(`/content/${id}`, data),
   delete: (id: string) => api.delete(`/content/${id}`),
   getSuggestions: (data: any) => api.post('/content/suggestions', data),
+  publish: (id: string) => api.post(`/content/${id}/publish`),
 };
 
 // Job API

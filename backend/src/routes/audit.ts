@@ -15,19 +15,44 @@ const router = Router();
  */
 router.post('/run', authenticate, validateBody(profileAuditSchema), async (req, res) => {
   try {
-    const { linkedinUrl, industry, focusAreas } = req.body;
+    const { linkedinUrl, industry, focusAreas, headline, about, bannerUrl } = req.body;
     const userId = req.user!.id;
 
-    // For prototype phase, we bypass the actual LinkedIn session requirement
-    // since the scraper returns mock data.
-    const cookies = {
-      liAt: 'mock_liAt',
-      jsessionId: 'mock_jsessionId',
-    };
+    // Build profile from: (1) request body, (2) stored profile, (3) scraper if session exists
+    let profile: any = { headline: null, about: null, bannerUrl: null };
 
-    // Scrape profile
-    const scraper = new LinkedInScraper();
-    const profile = await scraper.scrapeProfile(linkedinUrl, cookies);
+    // Priority 1: Use data provided directly in the request
+    if (headline || about) {
+      profile = { headline: headline || null, about: about || null, bannerUrl: bannerUrl || null };
+    } else {
+      // Priority 2: Use stored LinkedIn profile from user record
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { linkedinProfile: true },
+      });
+
+      if (user?.linkedinProfile) {
+        const stored = user.linkedinProfile as any;
+        profile = { headline: stored.headline || null, about: stored.about || null, bannerUrl: stored.bannerUrl || null };
+      }
+
+      // Priority 3: Attempt scraper if user has a real LinkedIn session
+      if (!profile.headline) {
+        const session = await prisma.linkedInSession.findUnique({ where: { userId } });
+        if (session?.isActive && linkedinUrl) {
+          const { Encryption } = await import('../utils/encryption');
+          const cookies = {
+            liAt: Encryption.decrypt(session.liAt),
+            jsessionId: Encryption.decrypt(session.jsessionId),
+          };
+          const scraper = new LinkedInScraper();
+          const scraped = await scraper.scrapeProfile(linkedinUrl, cookies);
+          if (scraped.headline || scraped.about) {
+            profile = scraped;
+          }
+        }
+      }
+    }
 
     // Run audit
     const auditor = new ProfileAuditor();

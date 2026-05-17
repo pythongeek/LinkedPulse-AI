@@ -5,7 +5,6 @@ import { validateBody } from '../middleware/validation';
 import { competitorAnalysisSchema } from '../utils/validation';
 import { CompetitorAnalyzer } from '../services/competitorAnalyzer';
 import { LinkedInScraper } from '../services/linkedinScraper';
-import { Encryption } from '../utils/encryption';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -19,18 +18,21 @@ router.post('/analyze', authenticate, validateBody(competitorAnalysisSchema), as
     const { topic, depth, postLimit } = req.body;
     const userId = req.user!.id;
 
-    // For prototype phase, we bypass the actual LinkedIn session requirement
-    // since the scraper returns mock data.
-    const cookies = {
-      liAt: 'mock_liAt',
-      jsessionId: 'mock_jsessionId',
-    };
+    // Attempt to scrape posts only if user has a real LinkedIn session
+    let posts: any[] = [];
+    const session = await prisma.linkedInSession.findUnique({ where: { userId } });
 
-    // Scrape posts
-    const scraper = new LinkedInScraper();
-    const posts = await scraper.scrapeTopicPosts(topic, cookies, postLimit);
+    if (session?.isActive) {
+      const { Encryption } = await import('../utils/encryption');
+      const cookies = {
+        liAt: Encryption.decrypt(session.liAt),
+        jsessionId: Encryption.decrypt(session.jsessionId),
+      };
+      const scraper = new LinkedInScraper();
+      posts = await scraper.scrapeTopicPosts(topic, cookies, postLimit);
+    }
 
-    // Analyze competitors
+    // Analyze competitors (works with empty posts — falls back to AI-only analysis)
     const analyzer = new CompetitorAnalyzer();
     const analysis = await analyzer.analyze(posts, topic, depth);
 
@@ -48,25 +50,28 @@ router.post('/analyze', authenticate, validateBody(competitorAnalysisSchema), as
       },
     });
 
-    // Save individual posts
-    await prisma.competitorPost.createMany({
-      data: posts.map((post) => ({
-        topicId: topicRecord.id,
-        author: post.author,
-        authorProfile: post.authorProfile,
-        content: post.content,
-        likes: post.likes,
-        comments: post.comments,
-        shares: post.shares,
-        postUrl: post.postUrl,
-        postedAt: post.timestamp ? new Date(post.timestamp) : null,
-      })),
-      skipDuplicates: true,
-    });
+    // Save individual posts (only if we scraped any)
+    if (posts.length > 0) {
+      await prisma.competitorPost.createMany({
+        data: posts.map((post) => ({
+          topicId: topicRecord.id,
+          author: post.author,
+          authorProfile: post.authorProfile,
+          content: post.content,
+          likes: post.likes,
+          comments: post.comments,
+          shares: post.shares,
+          postUrl: post.postUrl,
+          postedAt: post.timestamp ? new Date(post.timestamp) : null,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     res.json({
       analysis,
       posts: posts.slice(0, 10),
+      linkedinConnected: !!session?.isActive,
     });
   } catch (error) {
     logger.error('Competitor analysis error:', error);

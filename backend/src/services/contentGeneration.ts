@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Persona } from '@prisma/client';
-import { MiniMaxClient } from './minimax';
+import { AIClient as MiniMaxClient } from './minimax';
 import { PersonaService } from './personaService';
 import { ResearchService } from './researchService';
 import { TrendAnalyzer } from './trendAnalyzer';
@@ -46,8 +46,9 @@ export interface ContentSuggestion {
 /**
  * Multi-Agent Content Generation System
  * 
- * MiniMax M2.7 = Main Agent (content planning, writing, editing, engagement)
- * Gemini = Search/Visual Agent (research grounding, image generation, visual analysis)
+ * All agents powered by Gemini (via AIClient wrapper).
+ * Gemini handles: content planning, writing, editing, engagement,
+ * research grounding, image generation, and visual analysis.
  */
 export class ContentGenerationService {
   private minimax: MiniMaxClient;
@@ -377,7 +378,9 @@ Return JSON:
 {
   "title": "Compelling title",
   "content": "Full content with hook as first line"
-}`,
+}
+
+STRICT RULE: Do NOT output any conversational text, greetings, or warnings. ONLY output the requested JSON object. If you encounter an error or missing data, still output valid JSON with your best attempt at the content.`,
         { temperature: 0.8, maxTokens: 1000 }
       );
 
@@ -413,7 +416,9 @@ Tasks:
 Return JSON:
 {
   "content": "Edited content"
-}`
+}
+
+STRICT RULE: Do NOT output any conversational text, greetings, or warnings. ONLY output the requested JSON object. If you encounter an error or missing data, still output valid JSON with your best attempt at editing.`
       );
 
       return { ...draft, ...result, formattedContent: result.content };
