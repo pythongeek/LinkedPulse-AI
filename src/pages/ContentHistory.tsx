@@ -7,9 +7,13 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { FileText, Calendar, BarChart3, ExternalLink } from 'lucide-react';
 
 export default function ContentHistory() {
+  // ⚡ Bolt: Added staleTime to prevent unnecessary background refetches
+  // Why: Content history rarely changes without user action, so default query settings (which refetch on window focus/remount) waste network requests and database queries.
+  // Impact: Reduces unnecessary API calls and backend load by preventing refetches for 5 minutes.
   const { data: contents, isLoading } = useQuery({
     queryKey: ['contentHistory'],
     queryFn: () => contentApi.getAll({ limit: 50 }).then((res) => res.data.contents),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   return (
