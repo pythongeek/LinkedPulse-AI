@@ -40,7 +40,7 @@ router.post('/run', authenticate, validateBody(profileAuditSchema), async (req, 
       if (!profile.headline) {
         const session = await prisma.linkedInSession.findUnique({ where: { userId } });
         if (session?.isActive && linkedinUrl) {
-          const { Encryption } = await import('../utils/encryption');
+          const { Encryption } = await import('../utils/encryption.js');
           const cookies = {
             liAt: Encryption.decrypt(session.liAt),
             jsessionId: Encryption.decrypt(session.jsessionId),
