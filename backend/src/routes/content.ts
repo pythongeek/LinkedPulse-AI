@@ -71,24 +71,23 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { status, contentType, limit = '20', offset = '0' } = req.query;
 
-    const contents = await prisma.content.findMany({
-      where: {
-        userId: req.user!.id,
-        ...(status && { status: status as string }),
-        ...(contentType && { contentType: contentType as string }),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: parseInt(limit as string),
-      skip: parseInt(offset as string),
-    });
+    const where = {
+      userId: req.user!.id,
+      ...(status && { status: status as string }),
+      ...(contentType && { contentType: contentType as string }),
+    };
 
-    const total = await prisma.content.count({
-      where: {
-        userId: req.user!.id,
-        ...(status && { status: status as string }),
-        ...(contentType && { contentType: contentType as string }),
-      },
-    });
+    // ⚡ Bolt: Execute queries concurrently to reduce database round-trips
+    // Expected impact: Lower latency when fetching content list
+    const [contents, total] = await prisma.$transaction([
+      prisma.content.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: parseInt(limit as string),
+        skip: parseInt(offset as string),
+      }),
+      prisma.content.count({ where }),
+    ]);
 
     res.json({
       contents,
