@@ -444,10 +444,12 @@ ${content.content}
 
 SOURCES: ${JSON.stringify(sources?.slice(0, 5))}
 
+CRITICAL INSTRUCTION: If the content is a personal anecdote, reflection, or does not contain any objective factual claims that need verification, DO NOT replace the content with commentary. You MUST return the EXACT original content unchanged.
+
 Return JSON:
 {
   "verified": true,
-  "content": "Updated content with verified claims"
+  "content": "Updated content with verified claims (OR the exact original content if no changes needed)"
 }`
       );
 
