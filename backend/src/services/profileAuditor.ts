@@ -178,7 +178,7 @@ Return JSON:
     try {
       // Fetch image
       const response = await axios.get(bannerUrl, { responseType: 'arraybuffer' });
-      const mimeType = response.headers['content-type'];
+      const mimeType = response.headers['content-type'] as string || 'image/jpeg';
       const data = Buffer.from(response.data).toString('base64');
 
       const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
