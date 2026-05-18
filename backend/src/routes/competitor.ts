@@ -22,7 +22,7 @@ router.post('/analyze', authenticate, validateBody(competitorAnalysisSchema), as
     let posts: any[] = [];
     const session = await prisma.linkedInSession.findUnique({ where: { userId } });
 
-    if (session?.isActive) {
+    if (session?.isActive && session.liAt && session.jsessionId) {
       const { Encryption } = await import('../utils/encryption.js');
       const cookies = {
         liAt: Encryption.decrypt(session.liAt),

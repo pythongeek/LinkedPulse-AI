@@ -394,17 +394,16 @@ router.post('/:id/publish', authenticate, async (req, res) => {
     // 2. Fall back to environment variable for single-tenant / admin setup
     let accessToken = process.env.LINKEDIN_ACCESS_TOKEN;
     
-    // We check the DB for a session, but typically liAt is for scraping, not API. 
-    // If you add OAuth later, you'd store the OAuth token in a field like 'accessToken'.
+    // We check the DB for an OAuth token
     const session = await prisma.linkedInSession.findUnique({ where: { userId } });
-    if (session && (session as any).accessToken) {
-       accessToken = (session as any).accessToken;
+    if (session && session.accessToken) {
+       accessToken = session.accessToken;
     }
 
     if (!accessToken) {
       return res.status(401).json({
         error: {
-          message: 'LinkedIn API access token not configured in environment or session.',
+          message: 'LinkedIn API access token not configured in environment or session. Please connect your LinkedIn account via OAuth.',
           code: 'LINKEDIN_UNAUTHORIZED',
         },
       });

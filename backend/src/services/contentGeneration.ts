@@ -169,8 +169,19 @@ export class ContentGenerationService {
     logger.info(`[Phase 5] Final optimizations for: ${topic}`);
     
     let imagePrompts: string[] = [];
+    let images: string[] = [];
     if (includeImages) {
       imagePrompts = await this.visualAgent(topic, verified.content, persona);
+      
+      try {
+        const { ImageGenerationService } = await import('./imageGeneration.js');
+        const imageGen = new ImageGenerationService();
+        if (imagePrompts.length > 0) {
+          images = await imageGen.generateImages(imagePrompts[0], 'professional', 1, '16:9');
+        }
+      } catch (err) {
+        logger.error('Failed to generate actual images', err);
+      }
     }
 
     const [bestPostingTime, engagementData] = await Promise.all([
@@ -184,7 +195,7 @@ export class ContentGenerationService {
       outline: verified.outline,
       researchData,
       sources: verified.sources,
-      images: [],
+      images,
       imagePrompts,
       engagementPrediction: engagementData.score,
       seoScore: seoData.seoScore || seoData.score || 50,
@@ -354,15 +365,20 @@ Return ONLY a JSON array of 5 hook strings.`,
   /**
    * Writing Agent — MiniMax (main content writer)
    */
-  private async writingAgent(params: {
-    topic: string; contentType: string; persona?: Persona | null;
-    outline?: any; researchData: any; seoData: any; bestHook: string; targetAudience?: string;
-  }): Promise<any> {
+  private async writingAgent(params: any): Promise<any> {
     const { topic, contentType, persona, outline, researchData, seoData, bestHook, targetAudience } = params;
 
     try {
-      let systemPrompt = 'You are an expert LinkedIn content writer who creates viral, engaging posts.';
-      if (persona) systemPrompt = persona.systemPrompt;
+      const personaContext = persona ? `Write as ${persona.name} (${persona.jobRole}). Tone: ${persona.tone}.` : 'Write as a top-tier LinkedIn creator.';
+
+      const systemPrompt = `You are an elite LinkedIn ghostwriter. ${personaContext}
+
+STRICT LINKEDIN FORMATTING RULES:
+1. NO DENSE BLOCKS: Paragraphs MUST be 1-3 lines maximum.
+2. SPACING: Always use a blank line between every single paragraph.
+3. HOOK: Start with a scroll-stopping hook.
+4. EMOJIS: Use a maximum of 3-5 emojis in the entire post. Keep it professional.
+5. CTA: End with a clear, engaging question or Call-To-Action.`;
 
       const result = await this.minimax.promptJSON(
         systemPrompt,
@@ -409,12 +425,12 @@ STRICT RULE: Do NOT output any conversational text, greetings, or warnings. ONLY
 
 CONTENT: ${draft.content}
 
-Tasks:
-1. Strengthen the hook
-2. Improve readability
-3. Optimize emoji usage
-4. Strengthen call-to-action
-5. Add 3-5 relevant hashtags
+Tasks & STRICT RULES:
+1. NO DENSE BLOCKS: Break up long paragraphs. Max 1-3 lines per paragraph.
+2. SPACING: Ensure double line breaks between paragraphs.
+3. Optimize emoji usage (max 3-5 total).
+4. Strengthen the hook and call-to-action.
+5. Add 3-5 relevant hashtags.
 
 Return JSON:
 {

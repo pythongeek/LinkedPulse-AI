@@ -199,12 +199,14 @@ model ScrapingJob {
 model LinkedInSession {
   id          String   @id @default(uuid())
   userId      String   @unique @map("user_id")
-  liAt        String   @map("li_at")
-  jsessionId  String   @map("jsession_id")
+  liAt        String?  @map("li_at")
+  jsessionId  String?  @map("jsession_id")
   isActive    Boolean  @default(true) @map("is_active")
   lastUsed    DateTime @default(now()) @map("last_used")
   expiresAt   DateTime @map("expires_at")
   createdAt   DateTime @default(now()) @map("created_at")
+  accessToken String?  @map("access_token")
+  refreshToken String? @map("refresh_token")
   
   @@map("linkedin_sessions")
 }

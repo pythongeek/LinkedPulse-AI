@@ -39,7 +39,7 @@ router.post('/run', authenticate, validateBody(profileAuditSchema), async (req, 
       // Priority 3: Attempt scraper if user has a real LinkedIn session
       if (!profile.headline) {
         const session = await prisma.linkedInSession.findUnique({ where: { userId } });
-        if (session?.isActive && linkedinUrl) {
+        if (session?.isActive && linkedinUrl && session.liAt && session.jsessionId) {
           const { Encryption } = await import('../utils/encryption.js');
           const cookies = {
             liAt: Encryption.decrypt(session.liAt),

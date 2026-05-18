@@ -239,6 +239,94 @@ router.post('/linkedin', authenticate, validateBody(linkedinCookiesSchema), asyn
 });
 
 /**
+ * Initiate LinkedIn OAuth login
+ * GET /api/auth/linkedin/login
+ */
+router.get('/linkedin/login', authenticate, (req, res) => {
+  const clientId = process.env.LINKEDIN_CLIENT_ID;
+  if (!clientId) {
+    return res.status(500).json({ error: { message: 'LinkedIn Client ID not configured', code: 'CONFIG_ERROR' } });
+  }
+  
+  const host = req.get('host');
+  const protocol = req.protocol === 'http' && host?.includes('localhost') ? 'http' : 'https';
+  const backendUrl = process.env.VITE_API_URL || process.env.BACKEND_URL || `${protocol}://${host}`;
+  const redirectUri = `${backendUrl}/api/auth/linkedin/callback`;
+  const scope = 'w_member_social openid profile email';
+  const state = req.user!.id; // Track user
+
+  const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${encodeURIComponent(scope)}`;
+  res.json({ url });
+});
+
+import axios from 'axios';
+
+/**
+ * Handle LinkedIn OAuth callback
+ * GET /api/auth/linkedin/callback
+ */
+router.get('/linkedin/callback', async (req, res) => {
+  const { code, state, error, error_description } = req.query;
+  const frontendUrl = process.env.FRONTEND_URL || 'https://linked-pulse-ai.vercel.app';
+
+  if (error) {
+    logger.error('LinkedIn OAuth returned error:', error_description);
+    return res.redirect(`${frontendUrl}/settings?linkedin=error`);
+  }
+
+  try {
+    const userId = state as string;
+    const clientId = process.env.LINKEDIN_CLIENT_ID;
+    const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
+    
+    const host = req.get('host');
+    const protocol = req.protocol === 'http' && host?.includes('localhost') ? 'http' : 'https';
+    const backendUrl = process.env.VITE_API_URL || process.env.BACKEND_URL || `${protocol}://${host}`;
+    const redirectUri = `${backendUrl}/api/auth/linkedin/callback`;
+
+    // Exchange code for token
+    const tokenResponse = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', null, {
+      params: {
+        grant_type: 'authorization_code',
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+      },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    const { access_token, refresh_token, expires_in } = tokenResponse.data;
+
+    // Save token
+    await prisma.linkedInSession.upsert({
+      where: { userId },
+      update: {
+        accessToken: access_token,
+        refreshToken: refresh_token || null,
+        expiresAt: new Date(Date.now() + (expires_in * 1000)),
+        lastUsed: new Date(),
+        isActive: true,
+      },
+      create: {
+        userId,
+        accessToken: access_token,
+        refreshToken: refresh_token || null,
+        expiresAt: new Date(Date.now() + (expires_in * 1000)),
+        isActive: true,
+      },
+    });
+
+    res.redirect(`${frontendUrl}/settings?linkedin=success`);
+  } catch (err: any) {
+    logger.error('LinkedIn OAuth error:', err.response?.data || err.message);
+    res.redirect(`${frontendUrl}/settings?linkedin=error`);
+  }
+});
+
+/**
  * Disconnect LinkedIn
  * DELETE /api/auth/linkedin
  */

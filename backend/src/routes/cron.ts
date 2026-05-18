@@ -14,6 +14,10 @@ router.get('/migrate', async (req, res) => {
     await prisma.$executeRawUnsafe(`ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "best_posting_time" TEXT;`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "linkedin_optimization" JSONB;`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "competitive_analysis" JSONB;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "linkedin_sessions" ALTER COLUMN "li_at" DROP NOT NULL;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "linkedin_sessions" ALTER COLUMN "jsession_id" DROP NOT NULL;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "linkedin_sessions" ADD COLUMN IF NOT EXISTS "access_token" TEXT;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "linkedin_sessions" ADD COLUMN IF NOT EXISTS "refresh_token" TEXT;`);
     res.json({ success: true, message: "Migration completed successfully" });
   } catch (error) {
     logger.error('Migration error:', error);
