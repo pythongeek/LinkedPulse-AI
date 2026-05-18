@@ -7,6 +7,20 @@ import { prisma } from '../server';
 
 const router = express.Router();
 
+router.get('/migrate', async (req, res) => {
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "seo_score" DOUBLE PRECISION;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "hook_suggestions" JSONB;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "best_posting_time" TEXT;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "linkedin_optimization" JSONB;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "competitive_analysis" JSONB;`);
+    res.json({ success: true, message: "Migration completed successfully" });
+  } catch (error) {
+    logger.error('Migration error:', error);
+    res.status(500).json({ success: false, error: String(error) });
+  }
+});
+
 router.get('/tick', async (req, res) => {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
   
