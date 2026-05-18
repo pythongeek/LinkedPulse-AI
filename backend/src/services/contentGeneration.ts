@@ -378,7 +378,9 @@ STRICT LINKEDIN FORMATTING RULES:
 2. SPACING: Always use a blank line between every single paragraph.
 3. HOOK: Start with a scroll-stopping hook.
 4. EMOJIS: Use a maximum of 3-5 emojis in the entire post. Keep it professional.
-5. CTA: End with a clear, engaging question or Call-To-Action.`;
+5. CTA: End with a clear, engaging question or Call-To-Action.
+
+CRITICAL: You MUST return ONLY a valid JSON object matching the requested structure.`;
 
       const result = await this.minimax.promptJSON(
         systemPrompt,

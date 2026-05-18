@@ -59,11 +59,22 @@ export class ImageGenerationService {
       const dims = dimensions[aspectRatio] || dimensions['16:9'];
 
       const images: string[] = [];
+      const axios = (await import('axios')).default;
+      
       for (let i = 0; i < count; i++) {
         // Add random seed for variety
         const seed = Math.floor(Math.random() * 10000);
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${dims.width}&height=${dims.height}&seed=${seed}&nologo=true`;
-        images.push(imageUrl);
+        const imageUrl = `https://pollinations.ai/p/${encodedPrompt}?width=${dims.width}&height=${dims.height}&seed=${seed}&nologo=true`;
+        
+        try {
+          const response = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 15000 });
+          const base64 = Buffer.from(response.data, 'binary').toString('base64');
+          images.push(`data:image/jpeg;base64,${base64}`);
+        } catch (fetchError) {
+          logger.error('Failed to fetch pollinations image:', fetchError);
+          // Fallback to raw URL if fetch fails
+          images.push(imageUrl);
+        }
       }
 
       return images;
