@@ -207,7 +207,10 @@ export class ContentGenerationService {
    */
   private async researchAgent(topic: string, depth: 'quick' | 'deep'): Promise<any> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ 
+        model: 'gemini-2.5-flash',
+        generationConfig: { responseMimeType: 'application/json' }
+      });
 
       const prompt = `Research the topic: "${topic}" thoroughly for LinkedIn content.
 
@@ -460,7 +463,10 @@ Return JSON:
    */
   private async visualAgent(topic: string, content: string, persona?: Persona | null): Promise<string[]> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ 
+        model: 'gemini-2.5-flash',
+        generationConfig: { responseMimeType: 'application/json' }
+      });
 
       const visualDNA = persona?.visualDNA as any;
       const visualStyle = visualDNA?.style ? `Style: ${visualDNA.style}, Colors: ${visualDNA.colorScheme}` : 'Professional, clean LinkedIn imagery';

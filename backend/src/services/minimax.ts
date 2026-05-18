@@ -13,6 +13,7 @@ export interface MiniMaxOptions {
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
+  responseFormat?: 'json' | 'text';
 }
 
 /**
@@ -47,6 +48,7 @@ export class AIClient {
         generationConfig: {
           temperature,
           maxOutputTokens: maxTokens,
+          ...(options.responseFormat === 'json' && { responseMimeType: 'application/json' }),
         },
       });
 
@@ -82,7 +84,7 @@ export class AIClient {
     messages: MiniMaxMessage[],
     options: MiniMaxOptions = {}
   ): Promise<T> {
-    const text = await this.chat(messages, options);
+    const text = await this.chat(messages, { ...options, responseFormat: 'json' });
 
     // Strip markdown fences
     let cleanText = text.trim();
