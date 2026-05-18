@@ -71,6 +71,11 @@ router.get('/tick', async (req, res) => {
                 images: genResult.images || [],
                 status: 'draft',
                 engagementPrediction: genResult.engagementPrediction,
+                seoScore: genResult.seoScore,
+                hookSuggestions: genResult.hookSuggestions,
+                bestPostingTime: genResult.bestPostingTime,
+                linkedinOptimization: genResult.linkedinOptimization,
+                competitiveAnalysis: genResult.competitiveAnalysis,
               },
             });
 

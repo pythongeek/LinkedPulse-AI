@@ -79,6 +79,11 @@ model Content {
   images            String[]
   status            String   @default("draft")
   engagementPrediction Float? @map("engagement_prediction")
+  seoScore          Float?   @map("seo_score")
+  hookSuggestions   Json?    @map("hook_suggestions")
+  bestPostingTime   String?  @map("best_posting_time")
+  linkedinOptimization Json? @map("linkedin_optimization")
+  competitiveAnalysis Json?  @map("competitive_analysis")
   scheduledFor      DateTime? @map("scheduled_for")
   publishedAt       DateTime? @map("published_at")
   createdAt         DateTime @default(now()) @map("created_at")
