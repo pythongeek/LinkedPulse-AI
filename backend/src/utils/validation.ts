@@ -52,9 +52,28 @@ export const competitorAnalysisSchema = z.object({
 
 // Profile audit validation schema
 export const profileAuditSchema = z.object({
-  linkedinUrl: z.string().url('Invalid LinkedIn URL'),
+  linkedinUrl: z.string().url('Invalid LinkedIn URL').optional().or(z.literal('')),
   industry: z.string().min(1, 'Industry is required'),
   focusAreas: z.array(z.string()).optional(),
+  profileType: z.enum(['personal', 'company']).default('personal'),
+  headline: z.string().optional().nullable(),
+  about: z.string().optional().nullable(),
+  bannerUrl: z.string().optional().nullable(),
+  profilePicUrl: z.string().optional().nullable(),
+  experience: z.array(z.object({
+    role: z.string(),
+    company: z.string(),
+    description: z.string().optional(),
+    duration: z.string().optional(),
+  })).optional().nullable(),
+  skills: z.array(z.string()).optional().nullable(),
+  customUrlPresent: z.boolean().optional().default(false),
+  featuredPresent: z.boolean().optional().default(false),
+  tagline: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  ctaButton: z.string().optional().nullable(),
+  websiteUrl: z.string().optional().nullable(),
+  companySize: z.string().optional().nullable(),
 });
 
 // Image generation validation schema

@@ -13,18 +13,76 @@ const router = Router();
  * Run profile audit
  * POST /api/audit/run
  */
+const unpackAudit = (dbAudit: any) => {
+  if (!dbAudit) return null;
+  const extra = dbAudit.industryTrends as any;
+  if (extra && extra.pillars) {
+    return {
+      ...dbAudit,
+      profileType: extra.profileType || 'personal',
+      pillars: extra.pillars,
+      headlineAnalysis: extra.headlineAnalysis,
+      aboutAnalysis: extra.aboutAnalysis,
+      experienceAnalysis: extra.experienceAnalysis,
+      skillsAnalysis: extra.skillsAnalysis,
+      taglineAnalysis: extra.taglineAnalysis,
+      overviewAnalysis: extra.overviewAnalysis,
+      conversionAnalysis: extra.conversionAnalysis,
+      companyDetailsAnalysis: extra.companyDetailsAnalysis,
+      industryTrends: extra.trends
+    };
+  }
+  return dbAudit;
+};
+
+/**
+ * Run profile audit
+ * POST /api/audit/run
+ */
 router.post('/run', authenticate, validateBody(profileAuditSchema), async (req, res) => {
   try {
-    const { linkedinUrl, industry, focusAreas, headline, about, bannerUrl } = req.body;
+    const {
+      linkedinUrl,
+      industry,
+      focusAreas,
+      profileType = 'personal',
+      headline,
+      about,
+      bannerUrl,
+      profilePicUrl,
+      experience,
+      skills,
+      customUrlPresent = false,
+      featuredPresent = false,
+      tagline,
+      description,
+      ctaButton,
+      websiteUrl,
+      companySize
+    } = req.body;
     const userId = req.user!.id;
 
-    // Build profile from: (1) request body, (2) stored profile, (3) scraper if session exists
-    let profile: any = { headline: null, about: null, bannerUrl: null };
+    // Build profile object from manual overrides or scraper fallback
+    let profile: any = {
+      profileType,
+      headline: headline || null,
+      about: about || null,
+      bannerUrl: bannerUrl || null,
+      profilePicUrl: profilePicUrl || null,
+      experience: experience || null,
+      skills: skills || null,
+      customUrlPresent: !!customUrlPresent,
+      featuredPresent: !!featuredPresent,
+      tagline: tagline || null,
+      description: description || null,
+      ctaButton: ctaButton || null,
+      websiteUrl: websiteUrl || null,
+      companySize: companySize || null
+    };
 
-    // Priority 1: Use data provided directly in the request
-    if (headline || about) {
-      profile = { headline: headline || null, about: about || null, bannerUrl: bannerUrl || null };
-    } else {
+    const isManual = headline || about || tagline || description;
+
+    if (!isManual) {
       // Priority 2: Use stored LinkedIn profile from user record
       const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -33,13 +91,17 @@ router.post('/run', authenticate, validateBody(profileAuditSchema), async (req, 
 
       if (user?.linkedinProfile) {
         const stored = user.linkedinProfile as any;
-        profile = { headline: stored.headline || null, about: stored.about || null, bannerUrl: stored.bannerUrl || null };
+        profile = {
+          ...profile,
+          ...stored
+        };
       }
 
-      // Priority 3: Attempt scraper if user has a real LinkedIn session
-      if (!profile.headline) {
+      // Priority 3: Attempt scraper if user has an active session and URL is provided
+      const isProfileEmpty = profileType === 'company' ? !profile.tagline : !profile.headline;
+      if (isProfileEmpty && linkedinUrl) {
         const session = await prisma.linkedInSession.findUnique({ where: { userId } });
-        if (session?.isActive && linkedinUrl && session.liAt && session.jsessionId) {
+        if (session?.isActive && session.liAt && session.jsessionId) {
           const { Encryption } = await import('../utils/encryption.js');
           const cookies = {
             liAt: Encryption.decrypt(session.liAt),
@@ -47,8 +109,11 @@ router.post('/run', authenticate, validateBody(profileAuditSchema), async (req, 
           };
           const scraper = new LinkedInScraper();
           const scraped = await scraper.scrapeProfile(linkedinUrl, cookies);
-          if (scraped.headline || scraped.about) {
-            profile = scraped;
+          if (scraped.headline || scraped.about || scraped.tagline || scraped.description) {
+            profile = {
+              ...profile,
+              ...scraped
+            };
           }
         }
       }
@@ -58,25 +123,37 @@ router.post('/run', authenticate, validateBody(profileAuditSchema), async (req, 
     const auditor = new ProfileAuditor();
     const audit = await auditor.audit(profile, industry, focusAreas);
 
-    // Save audit to database
+    // Save audit to database with extra metadata serialized inside industryTrends JSON
     const savedAudit = await prisma.profileAudit.create({
       data: {
         userId,
-        headline: profile.headline,
-        about: profile.about,
+        headline: profile.headline || profile.tagline,
+        about: profile.about || profile.description,
         bannerUrl: profile.bannerUrl,
-        profileUrl: linkedinUrl,
+        profileUrl: linkedinUrl || null,
         auditScore: audit.overallScore,
         seoScore: audit.seoScore,
         brandScore: audit.brandScore,
-        gaps: audit.gaps,
-        suggestions: audit.suggestions,
-        topCreators: audit.topCreators,
-        industryTrends: audit.industryTrends,
+        gaps: audit.gaps as any,
+        suggestions: audit.suggestions as any,
+        topCreators: audit.topCreators as any,
+        industryTrends: {
+          trends: audit.industryTrends,
+          pillars: audit.pillars,
+          profileType: audit.profileType,
+          headlineAnalysis: audit.headlineAnalysis,
+          aboutAnalysis: audit.aboutAnalysis,
+          experienceAnalysis: audit.experienceAnalysis,
+          skillsAnalysis: audit.skillsAnalysis,
+          taglineAnalysis: audit.taglineAnalysis,
+          overviewAnalysis: audit.overviewAnalysis,
+          conversionAnalysis: audit.conversionAnalysis,
+          companyDetailsAnalysis: audit.companyDetailsAnalysis
+        } as any,
       },
     });
 
-    // Update user's LinkedIn profile data
+    // Update user's LinkedIn profile cache
     await prisma.user.update({
       where: { id: userId },
       data: {
@@ -113,7 +190,7 @@ router.get('/history', authenticate, async (req, res) => {
       take: 10,
     });
 
-    res.json({ audits });
+    res.json({ audits: audits.map(unpackAudit) });
   } catch (error) {
     logger.error('Get audit history error:', error);
     res.status(500).json({
@@ -145,7 +222,7 @@ router.get('/latest', authenticate, async (req, res) => {
       });
     }
 
-    res.json({ audit });
+    res.json({ audit: unpackAudit(audit) });
   } catch (error) {
     logger.error('Get latest audit error:', error);
     res.status(500).json({

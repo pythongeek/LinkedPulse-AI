@@ -74,6 +74,7 @@ export const auditApi = {
   getHistory: () => api.get('/audit/history'),
   getLatest: () => api.get('/audit/latest'),
   generateHeadlines: (data: any) => api.post('/audit/headlines', data),
+  generateAbout: (data: any) => api.post('/audit/about', data),
 };
 
 // Image API
