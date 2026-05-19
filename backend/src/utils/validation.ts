@@ -28,6 +28,9 @@ export const contentGenerationSchema = z.object({
   }).optional(),
   researchDepth: z.enum(['quick', 'deep']).default('quick'),
   includeImages: z.boolean().default(true),
+  customInstructions: z.string().optional(),
+  keywords: z.array(z.string()).optional(),
+  targetAudience: z.string().optional(),
 });
 
 // Trend analysis validation schema

@@ -17,6 +17,7 @@ export interface ContentGenerationOptions {
   includeImages: boolean;
   targetAudience?: string;
   keywords?: string[];
+  customInstructions?: string;
 }
 
 export interface GeneratedContent {
@@ -127,13 +128,13 @@ export class ContentGenerationService {
    * Phase 3: Content Writing (MiniMax)
    */
   async generatePhase3(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
-    const { topic, contentType, persona, outline, targetAudience } = options;
+    const { topic, contentType, persona, outline, targetAudience, customInstructions } = options;
     const { researchData, seoData, hookSuggestions } = intermediateResult;
 
     logger.info(`[Phase 3] Content Writing for: ${topic}`);
     const draft = await this.writingAgent({
       topic, contentType, persona, outline, researchData, seoData,
-      bestHook: hookSuggestions[0], targetAudience,
+      bestHook: hookSuggestions[0], targetAudience, customInstructions,
     });
 
     return {
@@ -146,11 +147,11 @@ export class ContentGenerationService {
    * Phase 4: Editing & Fact Checking (MiniMax)
    */
   async generatePhase4(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
-    const { topic, contentType } = options;
+    const { topic, contentType, customInstructions } = options;
     const { draft, seoData, researchData } = intermediateResult;
 
     logger.info(`[Phase 4] Editing & Fact Checking for: ${topic}`);
-    const edited = await this.editingAgent(draft, contentType, seoData);
+    const edited = await this.editingAgent(draft, contentType, seoData, customInstructions);
     const verified = await this.factCheckAgent(edited, researchData.sources);
 
     return {
@@ -366,7 +367,7 @@ Return ONLY a JSON array of 5 hook strings.`,
    * Writing Agent — MiniMax (main content writer)
    */
   private async writingAgent(params: any): Promise<any> {
-    const { topic, contentType, persona, outline, researchData, seoData, bestHook, targetAudience } = params;
+    const { topic, contentType, persona, outline, researchData, seoData, bestHook, targetAudience, customInstructions } = params;
 
     try {
       const personaContext = persona ? `Write as ${persona.name} (${persona.jobRole}). Tone: ${persona.tone}.` : 'Write as a top-tier LinkedIn creator.';
@@ -382,6 +383,11 @@ STRICT LINKEDIN FORMATTING RULES:
 
 CRITICAL: You MUST return ONLY a valid JSON object matching the requested structure.`;
 
+      const customPrompt = customInstructions 
+        ? `CUSTOM INSTRUCTIONS / PROMPT TEMPLATE (MUST ADHERE TO THIS STYLE/STRUCTURE):
+${customInstructions}` 
+        : '';
+
       const result = await this.minimax.promptJSON(
         systemPrompt,
         `Create a LinkedIn ${contentType} about "${topic}".
@@ -392,6 +398,7 @@ RESEARCH: ${JSON.stringify(researchData.keyInsights?.slice(0, 5))}
 SEO KEYWORDS: ${seoData.keywords?.map((k: any) => k.keyword).join(', ')}
 HASHTAGS: ${seoData.hashtags?.join(' ')}
 ${outline ? `OUTLINE: ${JSON.stringify(outline)}` : ''}
+${customPrompt}
 
 ${this.getContentTypeRequirements(contentType)}
 
@@ -419,8 +426,12 @@ STRICT RULE: Do NOT output any conversational text, greetings, or warnings. ONLY
   /**
    * Editing Agent — MiniMax
    */
-  private async editingAgent(draft: any, contentType: string, seoData: any): Promise<any> {
+  private async editingAgent(draft: any, contentType: string, seoData: any, customInstructions?: string): Promise<any> {
     try {
+      const customPrompt = customInstructions
+        ? `Adhere to these style constraints/templates if provided: ${customInstructions}`
+        : '';
+
       const result = await this.minimax.promptJSON(
         'You are a LinkedIn content editor specializing in maximum engagement.',
         `Edit this LinkedIn ${contentType} for MAXIMUM engagement:
@@ -433,6 +444,7 @@ Tasks & STRICT RULES:
 3. Optimize emoji usage (max 3-5 total).
 4. Strengthen the hook and call-to-action.
 5. Add 3-5 relevant hashtags.
+${customPrompt}
 
 Return JSON:
 {
@@ -567,12 +579,31 @@ Return JSON:
 
   private getContentTypeRequirements(contentType: string): string {
     const requirements: Record<string, string> = {
-      post: '150-300 words, single topic, strong hook, 3-5 takeaways, clear CTA',
-      carousel: '8-12 slides, one point per slide, visual-first, consistent design',
-      article: '800-1500 words, headings, data throughout, intro + conclusion',
-      poll: 'Clear question, 2-4 options, encourages comments, follow-up context',
+      post: `Structure this as a classic LinkedIn text post. 
+- Word count: 150-300 words.
+- Format: Start with a powerful 1-sentence scroll-stopping hook. Break up content with blank line spaces. Use bullet points or short lines for the core body to highlight 3-5 main key insights or takeaways. Include a maximum of 3-5 relevant emojis.
+- CTA: End with a clear, open-ended question designed to drive user comments and engagement.`,
+      carousel: `Structure this as a slide-by-slide script outline for a visual LinkedIn PDF Carousel.
+- Layout: Specify 'Slide 1' to 'Slide 10' explicitly.
+- Slide 1 (Cover): An attention-grabbing title and subtitle.
+- Slide 2 (Hook/Problem): Highlight the main pain point or question.
+- Slides 3-8 (Content/Steps): Focus on one clear, bite-sized value point or action step per slide with a bold headline and 1-2 bullet points.
+- Slide 9 (Visual Diagram/Summary): Outline a visual flowchart, comparison table, or diagram representation of the concept.
+- Slide 10 (Call-To-Action): A concluding slide asking the reader to like, share, comment, or swipe.`,
+      article: `Structure this as a professional deep-dive LinkedIn Article/Newsletter.
+- Word count: 800-1200 words.
+- Layout: Write in a structured narrative format with an engaging title, introductory hook, and clear subsections.
+- Headings: Use '## Heading' markdown formats to separate the main sections.
+- Content: Incorporate statistics, quotes, or case studies. Break up long text paragraphs to maintain online readability.
+- Summary: End with a solid conclusion summarizing key takeaways and a final prompt for professional networking discussion.`,
+      poll: `Structure this as an interactive LinkedIn Poll to maximize community dialogue.
+- Intro: Write a 2-3 sentence introductory hook sharing a debate, trend, or common question.
+- Poll Question: State a clear, singular question that users can vote on.
+- Options: Provide exactly 3 or 4 distinct, mutually exclusive choices. Clearly label them as 'Option A:', 'Option B:', etc.
+- Engagement: Ask users to vote and leave their detailed thoughts or reasoning in the comments section.`,
     };
-    return `FORMAT: ${requirements[contentType] || requirements.post}`;
+    return `FORMAT & STRUCTURE RULES:
+${requirements[contentType] || requirements.post}`;
   }
 
   /**

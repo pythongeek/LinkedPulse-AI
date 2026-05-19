@@ -20,6 +20,13 @@ const contentTypes = [
   { value: 'poll', label: 'Poll', icon: Lightbulb },
 ];
 
+const defaultPrompts: Record<string, string> = {
+  post: "Write a storytelling-style post. Start with an intriguing question or statement. Use short, punchy paragraphs. Emphasize a key lesson. Finish with a call-to-action to spark discussion.",
+  carousel: "Structure this as a 10-slide deck outline. Slide 1: Hook & Title. Slide 2: The problem. Slides 3-8: Step-by-step tips. Slide 9: Visual diagram explanation. Slide 10: Call to action.",
+  article: "Write an in-depth article. Include introduction, 3 main sections with H2 headings, bullet points for readability, relevant statistics, and a summary conclusion.",
+  poll: "Format as a poll. Start with a brief contextual story explaining why this choice is important. Provide 3 options (e.g., Option A, Option B, Option C). Prompt the user to vote and explain their reasoning in the comments.",
+};
+
 export default function ContentStudio() {
   const [topic, setTopic] = useState('');
   const [contentType, setContentType] = useState('post');
@@ -28,11 +35,19 @@ export default function ContentStudio() {
   const [keywords, setKeywords] = useState('');
   const [targetAudience, setTargetAudience] = useState('');
   const [includeImages] = useState(true);
+  const [customInstructions, setCustomInstructions] = useState(defaultPrompts.post);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [selectedHook, setSelectedHook] = useState<string>('');
   const [activeTab, setActiveTab] = useState('content');
+
+  useEffect(() => {
+    const defaults = Object.values(defaultPrompts);
+    if (!customInstructions || defaults.includes(customInstructions)) {
+      setCustomInstructions(defaultPrompts[contentType] || '');
+    }
+  }, [contentType]);
 
   const [jobPhase, setJobPhase] = useState<number>(0);
   const [jobTotalPhases, setJobTotalPhases] = useState<number>(1);
@@ -116,6 +131,7 @@ export default function ContentStudio() {
       keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
       targetAudience: targetAudience || undefined,
       includeImages,
+      customInstructions: customInstructions || undefined,
     });
   };
 
@@ -244,13 +260,47 @@ export default function ContentStudio() {
               </div>
             </div>
 
-            <div className="space-y-2">
+             <div className="space-y-2">
               <Label>Keywords (comma-separated)</Label>
               <Input
                 placeholder="e.g., AI, healthcare, machine learning"
                 value={keywords}
                 onChange={(e) => setKeywords(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-3 border-t pt-4 border-muted/60">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="customInstructions" className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                    <Sparkles className="h-4 w-4 text-purple-500 animate-pulse" />
+                    Custom Writing Prompt & Template
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Configure instructions or structural template for this {contentTypes.find(t => t.value === contentType)?.label || 'post'}
+                  </p>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-purple-500 transition-colors duration-200"
+                  onClick={() => setCustomInstructions(defaultPrompts[contentType] || '')}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                  Reset
+                </Button>
+              </div>
+              <div className="relative group rounded-md p-[1px] bg-gradient-to-r from-purple-500/10 via-blue-500/10 to-purple-500/10 focus-within:from-purple-500/30 focus-within:via-blue-500/30 focus-within:to-purple-500/30 transition-all duration-300">
+                <Textarea
+                  id="customInstructions"
+                  rows={4}
+                  className="w-full bg-background/90 text-sm font-mono leading-relaxed resize-y border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:ring-0"
+                  placeholder="Enter custom instructions or copy-paste your prompt template here..."
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                />
+              </div>
             </div>
 
             <Button

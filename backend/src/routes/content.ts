@@ -15,7 +15,17 @@ const router = Router();
  */
 router.post('/generate', authenticate, validateBody(contentGenerationSchema), async (req, res) => {
   try {
-    const { topic, contentType, personaId, outline, researchDepth, includeImages } = req.body;
+    const {
+      topic,
+      contentType,
+      personaId,
+      outline,
+      researchDepth,
+      includeImages,
+      customInstructions,
+      keywords,
+      targetAudience
+    } = req.body;
     const userId = req.user!.id;
 
     // Get persona if specified
@@ -43,6 +53,9 @@ router.post('/generate', authenticate, validateBody(contentGenerationSchema), as
         outline,
         researchDepth,
         includeImages,
+        customInstructions,
+        keywords,
+        targetAudience,
       }
     });
 
