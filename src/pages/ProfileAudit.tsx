@@ -926,12 +926,15 @@ export default function ProfileAudit() {
                   Identified Gaps ({latestAudit.gaps.length})
                 </h3>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {latestAudit.gaps.map((gap: string, i: number) => (
-                    <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/5 border border-rose-500/15">
-                      <AlertCircle className="h-4.5 w-4.5 text-rose-500 mt-0.5 shrink-0" />
-                      <p className="text-xs text-foreground leading-relaxed">{gap}</p>
-                    </div>
-                  ))}
+                  {latestAudit.gaps.map((gap: any, i: number) => {
+                    const gapText = typeof gap === 'string' ? gap : (gap && gap.gap) ? gap.gap : JSON.stringify(gap);
+                    return (
+                      <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/5 border border-rose-500/15">
+                        <AlertCircle className="h-4.5 w-4.5 text-rose-500 mt-0.5 shrink-0" />
+                        <p className="text-xs text-foreground leading-relaxed">{gapText}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -944,60 +947,68 @@ export default function ProfileAudit() {
                   Actionable Optimization Checklist
                 </h3>
                 <div className="space-y-3">
-                  {latestAudit.suggestions.map((suggestion: any, i: number) => (
-                    <div key={i} className="p-4 rounded-xl border border-border/50 bg-card/40 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      <div className="space-y-1 max-w-3xl">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              suggestion.priority === 'high'
-                                ? 'destructive'
-                                : suggestion.priority === 'medium'
-                                ? 'default'
-                                : 'secondary'
-                            }
-                            className="text-[9px] py-0 px-2 uppercase tracking-wide"
-                          >
-                            {suggestion.priority} priority
-                          </Badge>
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider font-mono">
-                            {suggestion.section}
-                          </span>
-                        </div>
-                        <p className="text-xs text-foreground leading-relaxed">{suggestion.suggestion}</p>
-                        {suggestion.example && (
-                          <div className="bg-muted/30 border border-border/40 p-2.5 rounded-lg text-xs font-mono text-muted-foreground mt-2 relative">
-                            <span className="text-[9px] uppercase font-bold text-primary block mb-1">AI Example suggestion:</span>
-                            "{suggestion.example}"
-                          </div>
-                        )}
-                      </div>
+                  {latestAudit.suggestions.map((suggestion: any, i: number) => {
+                    const isStr = typeof suggestion === 'string';
+                    const priority = isStr ? 'medium' : (suggestion.priority || 'medium');
+                    const section = isStr ? 'general' : (suggestion.section || 'general');
+                    const text = isStr ? suggestion : (suggestion.suggestion || JSON.stringify(suggestion));
+                    const example = isStr ? null : suggestion.example;
 
-                      {/* Interactive Helpers inside suggestions checklist */}
-                      <div className="shrink-0 flex items-center">
-                        {suggestion.section === 'headline' || suggestion.section === 'tagline' ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleGetHeadlineIdeas}
-                            disabled={isGeneratingHeadlines}
-                            className="h-8 text-[10px] px-2.5"
-                          >
-                            {isGeneratingHeadlines ? (
-                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                            ) : (
-                              <Sparkles className="h-3 w-3 text-primary mr-1" />
-                            )}
-                            Get AI Drafts
-                          </Button>
-                        ) : (
-                          <div className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
-                            <Check className="h-3.5 w-3.5 text-emerald-500" /> Pending Action
+                    return (
+                      <div key={i} className="p-4 rounded-xl border border-border/50 bg-card/40 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div className="space-y-1 max-w-3xl">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={
+                                priority === 'high'
+                                  ? 'destructive'
+                                  : priority === 'medium'
+                                  ? 'default'
+                                  : 'secondary'
+                              }
+                              className="text-[9px] py-0 px-2 uppercase tracking-wide"
+                            >
+                              {priority} priority
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider font-mono">
+                              {section}
+                            </span>
                           </div>
-                        )}
+                          <p className="text-xs text-foreground leading-relaxed">{text}</p>
+                          {example && (
+                            <div className="bg-muted/30 border border-border/40 p-2.5 rounded-lg text-xs font-mono text-muted-foreground mt-2 relative">
+                              <span className="text-[9px] uppercase font-bold text-primary block mb-1">AI Example suggestion:</span>
+                              "{example}"
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Interactive Helpers inside suggestions checklist */}
+                        <div className="shrink-0 flex items-center">
+                          {section === 'headline' || section === 'tagline' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleGetHeadlineIdeas}
+                              disabled={isGeneratingHeadlines}
+                              className="h-8 text-[10px] px-2.5"
+                            >
+                              {isGeneratingHeadlines ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <Sparkles className="h-3 w-3 text-primary mr-1" />
+                              )}
+                              Get AI Drafts
+                            </Button>
+                          ) : (
+                            <div className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
+                              <Check className="h-3.5 w-3.5 text-emerald-500" /> Pending Action
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1020,9 +1031,12 @@ export default function ProfileAudit() {
                       <div className="space-y-1">
                         <span className="text-[10px] uppercase font-bold text-muted-foreground font-mono">Trending Topics</span>
                         <div className="flex flex-wrap gap-1.5 pt-1">
-                          {latestAudit.industryTrends.trendingTopics.map((topic: string, i: number) => (
-                            <Badge key={i} variant="secondary" className="text-[10px] font-normal">{topic}</Badge>
-                          ))}
+                          {latestAudit.industryTrends.trendingTopics.map((topic: any, i: number) => {
+                            const topicText = typeof topic === 'string' ? topic : (topic && topic.topic) ? topic.topic : JSON.stringify(topic);
+                            return (
+                              <Badge key={i} variant="secondary" className="text-[10px] font-normal">{topicText}</Badge>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -1054,22 +1068,31 @@ export default function ProfileAudit() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-5 pb-5 pt-0 space-y-3.5">
-                    {latestAudit.topCreators.map((creator: any, i: number) => (
-                      <div key={i} className="text-xs space-y-1 pb-3 border-b border-border/30 last:pb-0 last:border-none">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-foreground flex items-center gap-1">
-                            {creator.name}
-                          </span>
-                          <Badge variant="outline" className="text-[8px] py-0 px-1 font-mono">Takeaway</Badge>
+                    {latestAudit.topCreators.map((creator: any, i: number) => {
+                      if (typeof creator === 'string') {
+                        return (
+                          <div key={i} className="text-xs pb-3 border-b border-border/30 last:pb-0 last:border-none">
+                            <p className="text-foreground font-medium">{creator}</p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={i} className="text-xs space-y-1 pb-3 border-b border-border/30 last:pb-0 last:border-none">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-foreground flex items-center gap-1">
+                              {creator.name}
+                            </span>
+                            <Badge variant="outline" className="text-[8px] py-0 px-1 font-mono">Takeaway</Badge>
+                          </div>
+                          <p className="text-muted-foreground text-[11px] leading-relaxed">
+                            <span className="text-foreground font-medium">Style:</span> {creator.contentStyle || creator.style}. <span className="text-foreground font-medium">Good at:</span> {creator.whatTheyDoWell || creator.goodAt}
+                          </p>
+                          <p className="text-primary text-[10px] italic">
+                            "Takeaway: {creator.keyTakeawaysForOthers || creator.takeaway}"
+                          </p>
                         </div>
-                        <p className="text-muted-foreground text-[11px] leading-relaxed">
-                          <span className="text-foreground font-medium">Style:</span> {creator.contentStyle}. <span className="text-foreground font-medium">Good at:</span> {creator.whatTheyDoWell}
-                        </p>
-                        <p className="text-primary text-[10px] italic">
-                          "Takeaway: {creator.keyTakeawaysForOthers || creator.takeaway}"
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </CardContent>
                 </Card>
               )}
