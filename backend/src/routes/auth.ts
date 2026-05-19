@@ -325,6 +325,37 @@ router.get('/linkedin/callback', async (req, res) => {
       },
     });
 
+    // Fetch profile details via LinkedIn OAuth /userinfo API
+    try {
+      const userinfoResponse = await axios.get('https://api.linkedin.com/v2/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${access_token}`
+        }
+      });
+      const info = userinfoResponse.data;
+      if (info) {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        let profile = (user?.linkedinProfile as any) || {};
+        profile = {
+          ...profile,
+          name: info.name || profile.name || null,
+          profilePicUrl: info.picture || profile.profilePicUrl || null,
+          email: info.email || profile.email || null
+        };
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            linkedinProfile: profile,
+            name: user?.name || info.name || undefined,
+            avatar: user?.avatar || info.picture || undefined
+          }
+        });
+        logger.info(`Updated user profile cache via LinkedIn OAuth userinfo for user: ${userId}`);
+      }
+    } catch (profileErr: any) {
+      logger.warn('Failed to fetch LinkedIn profile details during OAuth callback:', profileErr.message);
+    }
+
     res.redirect(`${frontendUrl}/settings?linkedin=success`);
   } catch (err: any) {
     logger.error('LinkedIn OAuth error:', err.response?.data || err.message);
