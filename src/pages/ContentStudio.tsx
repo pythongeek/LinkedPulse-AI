@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { contentApi, personaApi, jobApi } from '../services/api';
+import { contentApi, personaApi, jobApi, linkedinApi } from '../services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,13 +31,17 @@ export default function ContentStudio() {
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [jobStatus, setJobStatus] = useState<string | null>(null);
   const [selectedHook, setSelectedHook] = useState<string>('');
   const [activeTab, setActiveTab] = useState('content');
 
   const [jobPhase, setJobPhase] = useState<number>(0);
   const [jobTotalPhases, setJobTotalPhases] = useState<number>(1);
   const [isPublishing, setIsPublishing] = useState(false);
+
+  const { data: linkedinStatus } = useQuery({
+    queryKey: ['linkedinStatus'],
+    queryFn: () => linkedinApi.getStatus().then((res) => res.data),
+  });
 
   const { data: personas } = useQuery({
     queryKey: ['personas'],
@@ -54,7 +58,6 @@ export default function ContentStudio() {
       try {
         const res = await jobApi.getStatus(jobId);
         const job = res.data.job;
-        setJobStatus(job.status);
         if (job.phase !== undefined) setJobPhase(job.phase);
         if (job.totalPhases !== undefined) setJobTotalPhases(job.totalPhases);
         
@@ -90,7 +93,6 @@ export default function ContentStudio() {
     mutationFn: (data: any) => contentApi.generate(data),
     onSuccess: (res) => {
       setJobId(res.data.jobId);
-      setJobStatus('PENDING');
       toast.info('Generation started. This may take 1-2 minutes...');
     },
     onError: (error: any) => {
@@ -352,24 +354,38 @@ export default function ContentStudio() {
                     className="font-mono text-sm"
                   />
 
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1" onClick={() => navigator.clipboard.writeText(generatedContent.body || generatedContent.content)}>
+                  <div className="flex gap-2 items-start">
+                    <Button variant="outline" className="flex-1 h-10" onClick={() => navigator.clipboard.writeText(generatedContent.body || generatedContent.content)}>
                       Copy to Clipboard
                     </Button>
-                    <Button variant="secondary" className="flex-1">Save to Library</Button>
-                    <Button 
-                      className="flex-1 bg-[#0a66c2] hover:bg-[#004182] text-white" 
-                      onClick={handlePublish}
-                      disabled={isPublishing || generatedContent.status === 'published'}
-                    >
-                      {isPublishing ? (
-                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</>
-                      ) : generatedContent.status === 'published' ? (
-                        'Published ✓'
-                      ) : (
-                        'Publish to LinkedIn'
-                      )}
-                    </Button>
+                    <Button variant="secondary" className="flex-1 h-10">Save to Library</Button>
+                    {!linkedinStatus?.hasOAuth ? (
+                      <div className="flex-1 flex flex-col gap-1">
+                        <Button 
+                          className="w-full bg-[#0a66c2]/50 hover:bg-[#0a66c2]/50 text-white cursor-not-allowed h-10 text-xs" 
+                          disabled
+                        >
+                          Publish to LinkedIn
+                        </Button>
+                        <p className="text-[10px] text-rose-500 font-semibold text-center leading-snug">
+                          Connect via OAuth in Settings to publish
+                        </p>
+                      </div>
+                    ) : (
+                      <Button 
+                        className="flex-1 bg-[#0a66c2] hover:bg-[#004182] text-white h-10" 
+                        onClick={handlePublish}
+                        disabled={isPublishing || generatedContent.status === 'published'}
+                      >
+                        {isPublishing ? (
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</>
+                        ) : generatedContent.status === 'published' ? (
+                          'Published ✓'
+                        ) : (
+                          'Publish to LinkedIn'
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </TabsContent>
 

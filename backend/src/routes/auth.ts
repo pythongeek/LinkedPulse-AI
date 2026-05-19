@@ -141,16 +141,21 @@ router.post('/login', validateBody(userLoginSchema), async (req, res) => {
  */
 router.get('/me', authenticate, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      include: {
-        usageStats: true,
-        personas: {
-          where: { isDefault: true },
-          take: 1,
+    const [user, session] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: req.user!.id },
+        include: {
+          usageStats: true,
+          personas: {
+            where: { isDefault: true },
+            take: 1,
+          },
         },
-      },
-    });
+      }),
+      prisma.linkedInSession.findUnique({
+        where: { userId: req.user!.id },
+      }),
+    ]);
 
     if (!user) {
       return res.status(404).json({
@@ -167,13 +172,14 @@ router.get('/me', authenticate, async (req, res) => {
         email: user.email,
         name: user.name,
         avatar: user.avatar,
-        linkedinConnected: !!user.linkedinCookies,
+        linkedinConnected: (!!user.linkedinCookies) || (!!session && session.isActive),
         defaultPersona: user.personas[0] || null,
         usageStats: user.usageStats,
       },
     });
   } catch (error) {
     logger.error('Get user error:', error);
+
     res.status(500).json({
       error: {
         message: 'Failed to get user',
@@ -333,19 +339,57 @@ router.get('/linkedin/callback', async (req, res) => {
 router.delete('/linkedin', authenticate, async (req, res) => {
   try {
     const userId = req.user!.id;
+    const { type } = req.query;
 
-    // Delete session
-    await prisma.linkedInSession.deleteMany({
-      where: { userId },
-    });
+    const session = await prisma.linkedInSession.findUnique({ where: { userId } });
+    if (session) {
+      if (type === 'cookie') {
+        await prisma.linkedInSession.update({
+          where: { userId },
+          data: {
+            liAt: null,
+            jsessionId: null,
+          },
+        });
+        await prisma.user.update({
+          where: { id: userId },
+          data: { linkedinCookies: null },
+        });
+        logger.info(`LinkedIn cookies disconnected for user: ${userId}`);
+      } else if (type === 'oauth') {
+        await prisma.linkedInSession.update({
+          where: { userId },
+          data: {
+            accessToken: null,
+            refreshToken: null,
+          },
+        });
+        logger.info(`LinkedIn OAuth disconnected for user: ${userId}`);
+      } else {
+        await prisma.linkedInSession.delete({
+          where: { userId },
+        });
+        await prisma.user.update({
+          where: { id: userId },
+          data: { linkedinCookies: null },
+        });
+        logger.info(`LinkedIn completely disconnected for user: ${userId}`);
+      }
 
-    // Update user
-    await prisma.user.update({
-      where: { id: userId },
-      data: { linkedinCookies: null },
-    });
-
-    logger.info(`LinkedIn disconnected for user: ${userId}`);
+      // Clean up empty session
+      const updatedSession = await prisma.linkedInSession.findUnique({ where: { userId } });
+      if (updatedSession && !updatedSession.liAt && !updatedSession.jsessionId && !updatedSession.accessToken) {
+        await prisma.linkedInSession.delete({
+          where: { userId },
+        });
+      }
+    } else {
+      // Just in case, clean up user cookies if they exist
+      await prisma.user.update({
+        where: { id: userId },
+        data: { linkedinCookies: null },
+      });
+    }
 
     res.json({
       message: 'LinkedIn disconnected successfully',
@@ -375,6 +419,8 @@ router.get('/linkedin/status', authenticate, async (req, res) => {
 
     res.json({
       connected: !!session && session.isActive,
+      hasCookies: !!session && !!session.liAt && !!session.jsessionId,
+      hasOAuth: !!session && !!session.accessToken,
       expiresAt: session?.expiresAt || null,
       lastUsed: session?.lastUsed || null,
     });

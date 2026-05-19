@@ -94,6 +94,7 @@ export const userApi = {
 // LinkedIn API
 export const linkedinApi = {
   connect: (data: any) => api.post('/auth/linkedin', data),
-  disconnect: () => api.delete('/auth/linkedin'),
+  disconnect: (type?: 'cookie' | 'oauth') => api.delete('/auth/linkedin', { params: { type } }),
   getStatus: () => api.get('/auth/linkedin/status'),
+  getOAuthUrl: () => api.get('/auth/linkedin/login'),
 };
