@@ -4,6 +4,29 @@ import { logger } from '../utils/logger';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+function safeParseJSON<T>(text: string, fallback: T): T {
+  try {
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanText);
+  } catch (error) {
+    logger.error('Failed to parse LLM JSON response. Returning fallback. Text was:', text);
+    return fallback;
+  }
+}
+
+function sanitizeScore(score: any, defaultScore = 70): number {
+  if (typeof score === 'number' && !isNaN(score)) {
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }
+  if (typeof score === 'string') {
+    const parsed = parseInt(score, 10);
+    if (!isNaN(parsed)) {
+      return Math.max(0, Math.min(100, parsed));
+    }
+  }
+  return defaultScore;
+}
+
 export interface ProfileAuditResult {
   profileType: 'personal' | 'company';
   overallScore: number;
@@ -72,6 +95,13 @@ export interface ProfileAuditResult {
 }
 
 export class ProfileAuditor {
+  private getModel(mimeType = 'application/json') {
+    return genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: { responseMimeType: mimeType }
+    });
+  }
+
   /**
    * Run comprehensive profile audit
    */
@@ -105,15 +135,19 @@ export class ProfileAuditor {
       const skillsAnalysis = await this.analyzeSkillsAndCompleteness(profile.skills, profile.featuredPresent, profile.customUrlPresent);
 
       // Calculate pillar scores
+      const bannerScore = sanitizeScore(bannerAnalysis?.score, 70);
+      const headlineScore = sanitizeScore(headlineAnalysis?.score, 60);
+      const summaryScore = sanitizeScore(aboutAnalysis?.score, 60);
+      const experienceScore = sanitizeScore(experienceAnalysis?.score, 60);
+      const skillsScore = sanitizeScore(skillsAnalysis?.score, 60);
+
       const hasProfilePic = !!(profile.profilePicUrl && profile.profilePicUrl.trim().length > 0);
       const firstImpressionScore = Math.round(
-        ( (hasProfilePic ? 100 : 30) + bannerAnalysis.score + (profile.customUrlPresent ? 100 : 40) ) / 3
+        ( (hasProfilePic ? 100 : 30) + bannerScore + (profile.customUrlPresent ? 100 : 40) ) / 3
       );
-      const headlineScore = headlineAnalysis.score;
-      const summaryScore = aboutAnalysis.score;
       const seoScore = this.calculatePersonalSEOScore(profile, industry);
       const completenessScore = Math.round(
-        (experienceAnalysis.score + skillsAnalysis.score + (profile.featuredPresent ? 100 : 30)) / 3
+        (experienceScore + skillsScore + (profile.featuredPresent ? 100 : 30)) / 3
       );
 
       const overallScore = Math.round(
@@ -163,7 +197,7 @@ export class ProfileAuditor {
             status: firstImpressionScore >= 80 ? 'good' : firstImpressionScore >= 50 ? 'average' : 'critical',
             feedback: [
               hasProfilePic ? 'Profile photo is present.' : 'Profile photo is missing. Profiles with photos get up to 21x more views.',
-              bannerAnalysis.score >= 70 ? 'Professional banner is present.' : 'Custom banner is missing or sub-optimal. Banners visually establish your brand.',
+              bannerScore >= 70 ? 'Professional banner is present.' : 'Custom banner is missing or sub-optimal. Banners visually establish your brand.',
               profile.customUrlPresent ? 'Clean custom URL configured.' : 'Default LinkedIn URL in use. Clean it up (e.g., linkedin.com/in/yourname).'
             ]
           },
@@ -191,9 +225,9 @@ export class ProfileAuditor {
             score: completenessScore,
             status: completenessScore >= 80 ? 'good' : completenessScore >= 50 ? 'average' : 'critical',
             feedback: [
-              experienceAnalysis.score >= 75 ? 'Experience section has professional detail.' : 'Experience descriptions are missing metrics or action verbs.',
+              experienceScore >= 75 ? 'Experience section has professional detail.' : 'Experience descriptions are missing metrics or action verbs.',
               profile.featuredPresent ? 'Featured section is active.' : 'Featured section is inactive. Pin posts or project links to highlight credibility.',
-              skillsAnalysis.score >= 70 ? 'Skills list contains targeted keywords.' : 'Add more relevant industry skills to assist recruiter search filters.'
+              skillsScore >= 70 ? 'Skills list contains targeted keywords.' : 'Add more relevant industry skills to assist recruiter search filters.'
             ]
           }
         },
@@ -234,14 +268,16 @@ export class ProfileAuditor {
       const companyDetailsAnalysis = await this.analyzeCompanyDetails(profile);
 
       // Calculate scores
+      const bannerScore = sanitizeScore(bannerAnalysis?.score, 70);
+      const taglineScore = sanitizeScore(taglineAnalysis?.score, 60);
+      const overviewScore = sanitizeScore(overviewAnalysis?.score, 60);
+      const detailsScore = sanitizeScore(companyDetailsAnalysis?.score, 60);
+
       const hasLogo = !!(profile.profilePicUrl && profile.profilePicUrl.trim().length > 0);
       const firstImpressionScore = Math.round(
-        ( (hasLogo ? 100 : 30) + bannerAnalysis.score + taglineAnalysis.score ) / 3
+        ( (hasLogo ? 100 : 30) + bannerScore + taglineScore ) / 3
       );
-      const taglineScore = taglineAnalysis.score;
-      const overviewScore = overviewAnalysis.score;
       const seoScore = this.calculateCompanySEOScore(profile, industry);
-      const detailsScore = companyDetailsAnalysis.score;
 
       const overallScore = Math.round(
         (firstImpressionScore + taglineScore + overviewScore + seoScore + detailsScore) / 5
@@ -290,7 +326,7 @@ export class ProfileAuditor {
             status: firstImpressionScore >= 80 ? 'good' : firstImpressionScore >= 50 ? 'average' : 'critical',
             feedback: [
               hasLogo ? 'Company logo is present.' : 'Company logo is missing. Logo increases page follow rates.',
-              bannerAnalysis.score >= 70 ? 'Branded header banner image is present.' : 'Branded header image is missing or sub-optimal.',
+              bannerScore >= 70 ? 'Branded header banner image is present.' : 'Branded header image is missing or sub-optimal.',
               profile.tagline ? 'Tagline value hook is active.' : 'Tagline value hook is missing. Write a 1-sentence value statement.'
             ]
           },
@@ -340,8 +376,9 @@ export class ProfileAuditor {
    * Analyze headline
    */
   private async analyzeHeadline(headline: string, industry: string): Promise<any> {
+    const fallback = { score: 50, feedback: ['Headline analyzed (fallback state).'], suggestions: [] };
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `Analyze this LinkedIn headline for a ${industry} professional:
 "${headline || 'No headline provided'}"
 
@@ -360,14 +397,10 @@ Return JSON:
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      return { score: 50, feedback: ['Headline present.'], suggestions: [] };
+      return safeParseJSON(text, fallback);
     } catch (error) {
       logger.error('Headline analysis error:', error);
-      return { score: 50, feedback: [], suggestions: [] };
+      return fallback;
     }
   }
 
@@ -375,8 +408,9 @@ Return JSON:
    * Analyze About section
    */
   private async analyzeAbout(about: string, industry: string): Promise<any> {
+    const fallback = { score: 50, feedback: ['About section analyzed (fallback state).'], suggestions: [] };
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `Analyze this LinkedIn About section for a ${industry} professional:
 "${about || 'No About section provided'}"
 
@@ -396,14 +430,10 @@ Return JSON:
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      return { score: 50, feedback: ['About section present.'], suggestions: [] };
+      return safeParseJSON(text, fallback);
     } catch (error) {
       logger.error('About analysis error:', error);
-      return { score: 50, feedback: [], suggestions: [] };
+      return fallback;
     }
   }
 
@@ -418,13 +448,14 @@ Return JSON:
       };
     }
 
+    const fallback = { score: 70, feedback: ['Custom banner image detected. Ensure it visually asserts your brand.'] };
     try {
       if (bannerUrl.startsWith('http')) {
         const response = await axios.get(bannerUrl, { responseType: 'arraybuffer' });
         const mimeType = response.headers['content-type'];
         const data = Buffer.from(response.data).toString('base64');
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = this.getModel();
         const prompt = `Analyze this LinkedIn profile banner image. Evaluate:
 1. Professionalism
 2. Branding clarity
@@ -448,12 +479,9 @@ Return JSON:
         ]);
 
         const text = result.response.text();
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
+        return safeParseJSON(text, fallback);
       }
-      return { score: 70, feedback: ['Custom banner image detected. Make sure it visually asserts your brand.'] };
+      return fallback;
     } catch (error) {
       logger.error('Banner analysis error:', error);
       return {
@@ -474,8 +502,9 @@ Return JSON:
         suggestions: ['Add key roles with descriptions detailing your impact and tools used.']
       };
     }
+    const fallback = { score: 70, feedback: ['Experiences analyzed successfully.'], suggestions: [] };
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `Analyze this list of experiences for a ${industry} professional:
 ${JSON.stringify(experience)}
 
@@ -494,12 +523,10 @@ Return JSON:
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) return JSON.parse(jsonMatch[0]);
-      return { score: 70, feedback: ['Experiences analyzed successfully.'], suggestions: [] };
+      return safeParseJSON(text, fallback);
     } catch (e) {
       logger.error('Experience analysis error:', e);
-      return { score: 70, feedback: ['Experiences present.'], suggestions: [] };
+      return fallback;
     }
   }
 
@@ -563,8 +590,9 @@ Return JSON:
    * Identify personal profile gaps
    */
   private async identifyPersonalGaps(profile: any, industry: string, focusAreas?: string[]): Promise<string[]> {
+    const fallback: string[] = ['Profile is missing detail elements.'];
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `Identify gaps in this LinkedIn profile for a ${industry} professional:
 Headline: ${profile.headline || 'None'}
 About: ${profile.about ? profile.about.substring(0, 500) : 'None'}
@@ -575,16 +603,14 @@ Custom URL Present: ${profile.customUrlPresent ? 'Yes' : 'No'}
 ${focusAreas ? `Focus Areas: ${focusAreas.join(', ')}` : ''}
 
 What important components are missing to convert profile views to connections/leads?
-Return a JSON array of string gap descriptions.`;
+Return a JSON array of string gap descriptions. Example: ["About section lacks clear value proposition", "No portfolio links in featured section"]`;
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) return JSON.parse(jsonMatch[0]);
-      return ['Profile is missing detail elements.'];
+      return safeParseJSON(text, fallback);
     } catch (e) {
       logger.error('Identify personal gaps error:', e);
-      return [];
+      return fallback;
     }
   }
 
@@ -599,8 +625,9 @@ Return a JSON array of string gap descriptions.`;
         suggestions: ['Create a clear, brief tagline explaining who you serve and the core value you add.']
       };
     }
+    const fallback = { score: 70, feedback: ['Tagline analyzed.'], suggestions: [] };
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `Analyze this LinkedIn Company Page tagline for a company in the ${industry} industry:
 "${tagline}"
 
@@ -618,12 +645,10 @@ Return JSON:
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) return JSON.parse(jsonMatch[0]);
-      return { score: 70, feedback: ['Tagline analyzed.'], suggestions: [] };
+      return safeParseJSON(text, fallback);
     } catch (e) {
       logger.error('Analyze tagline error:', e);
-      return { score: 70, feedback: ['Tagline present.'], suggestions: [] };
+      return fallback;
     }
   }
 
@@ -638,8 +663,9 @@ Return JSON:
         suggestions: ['Write a 200-400 word description clarifying what you do, who you help, and why clients choose you.']
       };
     }
+    const fallback = { score: 70, feedback: ['Overview description present.'], suggestions: [] };
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `Analyze this LinkedIn Company Page overview description in the ${industry} industry:
 "${description}"
 
@@ -658,12 +684,10 @@ Return JSON:
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) return JSON.parse(jsonMatch[0]);
-      return { score: 70, feedback: ['Overview analyzed.'], suggestions: [] };
+      return safeParseJSON(text, fallback);
     } catch (e) {
       logger.error('Analyze overview error:', e);
-      return { score: 70, feedback: ['Overview description present.'], suggestions: [] };
+      return fallback;
     }
   }
 
@@ -742,8 +766,9 @@ Return JSON:
    * Identify company page gaps
    */
   private async identifyCompanyGaps(profile: any, industry: string, focusAreas?: string[]): Promise<string[]> {
+    const fallback: string[] = ['Company page is missing detail items.'];
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `Identify gaps in this LinkedIn Company Page for a business in the ${industry} industry:
 Tagline: ${profile.tagline || 'None'}
 Description: ${profile.description ? profile.description.substring(0, 500) : 'None'}
@@ -753,16 +778,14 @@ Company Size: ${profile.companySize || 'None'}
 ${focusAreas ? `Focus Areas: ${focusAreas.join(', ')}` : ''}
 
 What brand elements, core details, or lead capture paths are missing from this company page?
-Return a JSON array of string gap descriptions.`;
+Return a JSON array of string gap descriptions. Example: ["Missing link to official website", "About description is too short to explain product offering"]`;
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) return JSON.parse(jsonMatch[0]);
-      return ['Company page is missing detail items.'];
+      return safeParseJSON(text, fallback);
     } catch (e) {
       logger.error('Identify company gaps error:', e);
-      return [];
+      return fallback;
     }
   }
 
@@ -770,31 +793,34 @@ Return a JSON array of string gap descriptions.`;
    * Get top creators in industry
    */
   async getTopCreators(industry: string): Promise<any[]> {
+    const fallback: any[] = [];
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `List 5 top LinkedIn accounts (creators or companies) in the ${industry} industry.
 
-For each, provide:
-- Name
-- What they do well
-- Their content style
-- Key takeaways for others
+For each, return a JSON array containing objects with exactly these keys:
+- "name": string (name of creator/company)
+- "whatTheyDoWell": string (description of their strength)
+- "contentStyle": string (description of content style)
+- "keyTakeawaysForOthers": string (actionable takeaway)
 
-Return JSON array.`;
+Return JSON array format:
+[
+  {
+    "name": "...",
+    "whatTheyDoWell": "...",
+    "contentStyle": "...",
+    "keyTakeawaysForOthers": "..."
+  }
+]`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      return [];
+      return safeParseJSON(text, fallback);
     } catch (error) {
       logger.error('Get top creators error:', error);
-      return [];
+      return fallback;
     }
   }
 
@@ -802,32 +828,40 @@ Return JSON array.`;
    * Get industry trends
    */
   async getIndustryTrends(industry: string): Promise<any> {
+    const fallback = {
+      popularFormats: ['Text posts', 'Image/Carousel'],
+      trendingTopics: ['LinkedIn branding', 'AI productivity'],
+      successfulPostStructures: ['Hook -> Story -> Takeaways -> CTA'],
+      visualTrends: ['Simple graphic carousels'],
+      engagementStrategies: ['Asking conversational questions']
+    };
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `What are the current LinkedIn content trends for ${industry} in 2026?
 
-Include:
-1. Popular content formats
-2. Trending topics
-3. Successful post structures
-4. Visual trends
-5. Engagement strategies
+Return a JSON object with exactly these fields:
+- "popularFormats": array of strings
+- "trendingTopics": array of strings
+- "successfulPostStructures": array of strings
+- "visualTrends": array of strings
+- "engagementStrategies": array of strings
 
-Return JSON format.`;
+Return JSON format:
+{
+  "popularFormats": ["...", "..."],
+  "trendingTopics": ["...", "..."],
+  "successfulPostStructures": ["...", "..."],
+  "visualTrends": ["...", "..."],
+  "engagementStrategies": ["...", "..."]
+}`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      return {};
+      return safeParseJSON(text, fallback);
     } catch (error) {
       logger.error('Get industry trends error:', error);
-      return {};
+      return fallback;
     }
   }
 
@@ -835,8 +869,9 @@ Return JSON format.`;
    * Generate headline variations
    */
   async generateHeadlines(currentHeadline: string, industry: string, focus?: string): Promise<any[]> {
+    const fallback: any[] = [];
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = this.getModel();
       const prompt = `Generate 5 LinkedIn headline variations for a ${industry} professional.
 
 Current headline: "${currentHeadline}"
@@ -847,21 +882,21 @@ Create:
 - 2 brand-focused headlines (unique value proposition)
 - 1 hybrid headline
 
-Return JSON array with type and headline.`;
+Return a JSON array of objects with exactly this structure:
+[
+  {
+    "type": "SEO-optimized" | "Brand-focused" | "Hybrid",
+    "headline": "..."
+  }
+]`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      return [];
+      return safeParseJSON(text, fallback);
     } catch (error) {
       logger.error('Generate headlines error:', error);
-      return [];
+      return fallback;
     }
   }
 
