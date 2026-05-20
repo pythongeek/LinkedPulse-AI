@@ -27,8 +27,9 @@ import {
   Menu,
   Bell,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -169,7 +170,9 @@ export default function DashboardLayout() {
 
         {/* Page Content */}
         <main className="p-4 sm:p-6 lg:p-8">
-          <Outlet />
+          <Suspense fallback={<div className="flex h-full min-h-[50vh] items-center justify-center"><Spinner className="h-8 w-8 text-primary" /></div>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>
