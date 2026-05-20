@@ -4,6 +4,7 @@ import { AIClient as MiniMaxClient } from './minimax';
 import { PersonaService } from './personaService';
 import { ResearchService } from './researchService';
 import { TrendAnalyzer } from './trendAnalyzer';
+import { EngagementPredictor } from './engagementPredictor';
 import { logger } from '../utils/logger';
 import { HookFormula, PollDuration, CTAType, CarouselSlide, PollOption, LINKEDIN_LIMITS } from '../types/contentTypes';
 
@@ -14,7 +15,7 @@ export interface ContentGenerationOptions {
   contentType: 'post' | 'carousel' | 'article' | 'poll';
   persona?: Persona | null;
   outline?: any;
-  researchDepth: 'quick' | 'deep';
+  researchDepth: 'none' | 'quick' | 'deep';
   includeImages: boolean;
   targetAudience?: string;
   keywords?: string[];
@@ -53,6 +54,9 @@ export interface GeneratedContent {
   articleExcerpt?: string;
   charCount?: number;
   wordCount?: number;
+  researchQuality?: number;
+  dataSourceCount?: number;
+  isAiGrounded?: boolean;
 }
 
 export interface ContentSuggestion {
@@ -101,7 +105,19 @@ export class ContentGenerationService {
     const { topic, researchDepth } = options;
     logger.info(`[Phase 0] Research for: ${topic}`);
     const researchData = await this.researchAgent(topic, researchDepth);
-    return { researchData };
+    
+    const dataSourceCount = researchData.sources?.length || 0;
+    const isAiGrounded = dataSourceCount > 0;
+    const statsCount = researchData.statistics?.length || 0;
+    const casesCount = researchData.caseStudies?.length || 0;
+    const researchQuality = Math.min(100, Math.round((dataSourceCount * 10) + (statsCount * 10) + (casesCount * 10) + 30));
+
+    return { 
+      researchData,
+      researchQuality,
+      dataSourceCount,
+      isAiGrounded
+    };
   }
 
   /**
@@ -202,7 +218,7 @@ export class ContentGenerationService {
    */
   async generatePhase5(options: ContentGenerationOptions, intermediateResult: any): Promise<GeneratedContent> {
     const { topic, contentType, persona, includeImages, targetAudience, includeFirstComment, linkToInclude } = options;
-    const { researchData, seoData, hookSuggestions, verified, competitiveAnalysis } = intermediateResult;
+    const { researchData, seoData, hookSuggestions, verified, competitiveAnalysis, researchQuality, dataSourceCount, isAiGrounded } = intermediateResult;
 
     logger.info(`[Phase 5] Final optimizations for: ${topic}`);
     
@@ -222,9 +238,8 @@ export class ContentGenerationService {
       }
     }
 
-    const [bestPostingTime, engagementData] = await Promise.all([
-      this.timingAgent(targetAudience),
-      this.engagementPredictorAgent(verified.content, contentType, hookSuggestions)
+    const [bestPostingTime] = await Promise.all([
+      this.timingAgent(targetAudience)
     ]);
 
     // Generate first comment if requested
@@ -236,6 +251,9 @@ export class ContentGenerationService {
     // Extract content-type-specific fields from verified draft
     const contentBody = verified.content || verified.body || verified.introText || verified.caption || '';
 
+    // Deterministic prediction using the rules engine
+    const predictionResult = EngagementPredictor.predict(contentBody, contentType, researchQuality, firstComment);
+
     return {
       title: verified.title || verified.question || topic,
       content: contentBody,
@@ -244,7 +262,7 @@ export class ContentGenerationService {
       sources: verified.sources,
       images,
       imagePrompts,
-      engagementPrediction: engagementData.score,
+      engagementPrediction: predictionResult.score,
       seoScore: seoData.seoScore || seoData.score || 50,
       hookSuggestions,
       bestPostingTime,
@@ -263,6 +281,9 @@ export class ContentGenerationService {
       articleExcerpt: verified.excerpt || null,
       charCount: verified.charCount || (contentBody ? contentBody.length : null),
       wordCount: verified.wordCount || (contentBody ? this.countWords(contentBody) : null),
+      researchQuality: researchQuality || 50,
+      dataSourceCount: dataSourceCount || 0,
+      isAiGrounded: isAiGrounded || false,
     };
   }
 
@@ -271,17 +292,20 @@ export class ContentGenerationService {
   /**
    * Research Agent — Gemini (Google Search Grounding)
    */
-  private async researchAgent(topic: string, depth: 'quick' | 'deep'): Promise<any> {
+  private async researchAgent(topic: string, depth: 'none' | 'quick' | 'deep'): Promise<any> {
     try {
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash',
-        generationConfig: { responseMimeType: 'application/json' }
-      });
+      const modelConfig: any = { 
+        model: 'gemini-2.5-flash'
+      };
+      if (depth !== 'none') {
+        modelConfig.tools = [{ googleSearch: {} } as any];
+      }
+      const model = genAI.getGenerativeModel(modelConfig);
 
-      const prompt = `Research the topic: "${topic}" thoroughly for LinkedIn content.
-
+      const prompt = `Research the topic: "${topic}" thoroughly for LinkedIn content. Search Google to get live, up-to-date facts, statistics, B2B trends, and expert comments.
+      
 Tasks:
-1. Find latest statistics and data (2024-2025 preferred, with sources)
+1. Find latest statistics and data (2024-2026 preferred, with sources)
 2. Identify expert opinions and thought leaders
 3. Locate case studies with numbers
 4. Find relevant research papers

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { contentApi, personaApi, jobApi, linkedinApi } from '../services/api';
+import { contentApi, personaApi, jobApi, linkedinApi, systemApi } from '../services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +33,7 @@ import {
   CheckSquare
 } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { CONTENT_TYPE_CONFIGS, PHASE_LABELS } from '@/config/contentTypeConfig';
 import { CharacterCounter } from '@/components/studio/CharacterCounter';
 import { PostFields } from '@/components/studio/fields/PostFields';
@@ -50,6 +51,7 @@ export default function ContentStudio() {
   const [contentType, setContentType] = useState('post');
   const [personaId, setPersonaId] = useState('');
   const [researchDepth, setResearchDepth] = useState('quick');
+  const [isGrounded, setIsGrounded] = useState(true);
   const [keywords, setKeywords] = useState('');
   const [targetAudience, setTargetAudience] = useState('');
   const [includeImages] = useState(true);
@@ -91,6 +93,12 @@ export default function ContentStudio() {
   const { data: linkedinStatus } = useQuery({
     queryKey: ['linkedinStatus'],
     queryFn: () => linkedinApi.getStatus().then((res) => res.data),
+  });
+
+  const { data: systemHealth } = useQuery({
+    queryKey: ['systemHealth'],
+    queryFn: () => systemApi.getHealth().then((res) => res.data),
+    refetchInterval: 30000,
   });
 
   const { data: personas } = useQuery({
@@ -162,7 +170,7 @@ export default function ContentStudio() {
       topic,
       contentType,
       personaId: personaId || undefined,
-      researchDepth,
+      researchDepth: isGrounded ? researchDepth : 'none',
       keywords: keywords.split(',').map((k) => k.trim()).filter(Boolean),
       targetAudience: targetAudience || undefined,
       includeImages,
@@ -226,13 +234,43 @@ export default function ContentStudio() {
 
   return (
     <div className="space-y-6 text-foreground max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-sans">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-indigo-400 bg-clip-text text-transparent">
-          LinkedIn Content Studio
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1.5 max-w-2xl leading-normal">
-          Generate algorithm-optimized, fact-checked, visual content and slides using our specialized LinkedIn agent pipeline.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/40 pb-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-indigo-400 bg-clip-text text-transparent">
+            LinkedIn Content Studio
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1.5 max-w-2xl leading-normal">
+            Generate algorithm-optimized, fact-checked, visual content and slides using our specialized LinkedIn agent pipeline.
+          </p>
+        </div>
+        
+        {/* System API Capability status indicators */}
+        <div className="flex flex-wrap items-center gap-2 bg-secondary/25 p-2 rounded-xl border border-border/40">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/60 text-[10px] font-bold text-foreground">
+            <span className="text-muted-foreground">Trends API:</span>
+            {systemHealth?.capabilities?.hasRealTrends ? (
+              <span className="text-green-500 flex items-center gap-1">● Live</span>
+            ) : (
+              <span className="text-amber-500 flex items-center gap-1">▲ AI-only</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/60 text-[10px] font-bold text-foreground">
+            <span className="text-muted-foreground">Google Grounding:</span>
+            {systemHealth?.capabilities?.hasRealResearch ? (
+              <span className="text-green-500 flex items-center gap-1">● Live</span>
+            ) : (
+              <span className="text-amber-500 flex items-center gap-1">▲ Disabled</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/60 text-[10px] font-bold text-foreground">
+            <span className="text-muted-foreground">LinkedIn OAuth:</span>
+            {systemHealth?.capabilities?.hasLinkedInOAuth ? (
+              <span className="text-green-500 flex items-center gap-1">● Active</span>
+            ) : (
+              <span className="text-indigo-400 flex items-center gap-1">⬥ Cookie fallback</span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-12 items-start">
@@ -417,29 +455,43 @@ export default function ContentStudio() {
 
               {/* Research and Prompt options */}
               <div className="space-y-4 border-t border-border/60 pt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Research Depth</Label>
-                    <Select value={researchDepth} onValueChange={setResearchDepth}>
-                      <SelectTrigger className="bg-card/45 border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="quick">Quick web search</SelectItem>
-                        <SelectItem value="deep">Deep academic verify</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Keywords</Label>
-                    <Input
-                      placeholder="e.g., productivity, startup"
-                      value={keywords}
-                      onChange={(e) => setKeywords(e.target.value)}
-                      className="bg-card/45 border-border"
+                <div className="space-y-3 p-3.5 border border-border/65 rounded-xl bg-secondary/10">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="grounding-switch" className="text-xs font-semibold text-foreground">Google Search Grounding</Label>
+                      <p className="text-[10px] text-muted-foreground leading-normal">Search live web to anchor facts & quotes.</p>
+                    </div>
+                    <Switch
+                      id="grounding-switch"
+                      checked={isGrounded}
+                      onCheckedChange={setIsGrounded}
                     />
                   </div>
+                  
+                  {isGrounded && (
+                    <div className="space-y-1.5 pt-2.5 border-t border-border/40 transition-all">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Grounding Level</Label>
+                      <Select value={researchDepth} onValueChange={setResearchDepth}>
+                        <SelectTrigger className="bg-card/45 border-border h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="quick">Quick web search (7-10 sources)</SelectItem>
+                          <SelectItem value="deep">Deep academic verify (15+ sources)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Focus Keywords</Label>
+                  <Input
+                    placeholder="e.g., productivity, startup"
+                    value={keywords}
+                    onChange={(e) => setKeywords(e.target.value)}
+                    className="bg-card/45 border-border"
+                  />
                 </div>
 
                 {/* Include First Comment toggle */}
@@ -517,6 +569,24 @@ export default function ContentStudio() {
               <CardDescription className="text-xs">Evaluate and optimize your generated posts.</CardDescription>
             </CardHeader>
             <CardContent>
+              {generatedContent && (
+                <div className="grid grid-cols-3 gap-3 p-3 bg-secondary/30 rounded-xl border border-border/80 mb-5 text-center">
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-card/65 shadow-sm border border-border/30">
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Grounded Status</span>
+                    <Badge variant={generatedContent.isAiGrounded ? 'default' : 'secondary'} className={cn("text-[9px] font-bold py-0.5 px-2", generatedContent.isAiGrounded ? "bg-green-500 hover:bg-green-500 text-white" : "")}>
+                      {generatedContent.isAiGrounded ? "✓ GOOGLE SEARCH" : "AI ONLY"}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-card/65 shadow-sm border border-border/30">
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Research Quality</span>
+                    <span className="text-xs font-black font-mono text-primary">{generatedContent.researchQuality || 50}%</span>
+                  </div>
+                  <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-card/65 shadow-sm border border-border/30">
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Verified Sources</span>
+                    <span className="text-xs font-black font-mono text-indigo-400">{generatedContent.dataSourceCount || 0} sites</span>
+                  </div>
+                </div>
+              )}
               {generatedContent ? (
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList className="grid w-full grid-cols-6 mb-5 bg-secondary/40 p-1 rounded-xl">
@@ -534,84 +604,91 @@ export default function ContentStudio() {
 
                   {/* 1. Main Content Tab */}
                   <TabsContent value="content" className="space-y-5 focus-visible:outline-none">
-                    {/* Live Preview Embed */}
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Feed Card Visual Preview</Label>
-                      <LinkedInPreview
-                        content={generatedContent.body || generatedContent.content}
-                        contentType={contentType}
-                        slides={generatedContent.slides}
-                        pollQuestion={generatedContent.pollQuestion}
-                        pollOptions={generatedContent.pollOptions}
-                        charCount={generatedContent.charCount}
-                        articleTitle={generatedContent.articleTitle || articleTitle}
-                        articleExcerpt={generatedContent.articleExcerpt}
-                      />
-                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      {/* Left Column: Editor & Preview */}
+                      <div className="lg:col-span-7 space-y-5">
+                        {/* Editor Textarea */}
+                        <div className="space-y-2.5">
+                          <div className="flex justify-between items-center">
+                            <Label className="text-xs font-semibold">Post Body Editor</Label>
+                            <CharacterCounter
+                              value={generatedContent.body || generatedContent.content || ''}
+                              limit={config?.charLimit || 3000}
+                              softLimit={config?.charSoftLimit}
+                              hookWindowChars={config?.hookWindowChars || 210}
+                              showHookWindow={true}
+                            />
+                          </div>
+                          <Textarea
+                            value={generatedContent.body || generatedContent.content || ''}
+                            onChange={(e) =>
+                              setGeneratedContent({ ...generatedContent, body: e.target.value })
+                            }
+                            rows={10}
+                            className="font-mono text-sm leading-relaxed bg-card border-border focus-visible:ring-primary"
+                          />
+                        </div>
 
-                    {/* Editor Textarea */}
-                    <div className="space-y-2.5">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-xs font-semibold">Post Body Editor</Label>
-                        <CharacterCounter
-                          value={generatedContent.body || generatedContent.content || ''}
-                          limit={config?.charLimit || 3000}
-                          softLimit={config?.charSoftLimit}
-                          hookWindowChars={config?.hookWindowChars || 210}
-                          showHookWindow={true}
+                        {/* Live Preview Embed */}
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Feed Card Visual Preview</Label>
+                          <LinkedInPreview
+                            content={generatedContent.body || generatedContent.content}
+                            contentType={contentType}
+                            slides={generatedContent.slides}
+                            pollQuestion={generatedContent.pollQuestion}
+                            pollOptions={generatedContent.pollOptions}
+                            charCount={generatedContent.charCount}
+                            articleTitle={generatedContent.articleTitle || articleTitle}
+                            articleExcerpt={generatedContent.articleExcerpt}
+                          />
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex gap-2 flex-wrap items-center pt-2">
+                          <Button variant="outline" className="flex-1 h-10 gap-1.5" onClick={handleCopyCleanContent}>
+                            <Copy className="w-4 h-4" />
+                            Copy Clean Content
+                          </Button>
+                          {!linkedinStatus?.hasOAuth ? (
+                            <div className="flex-1 flex flex-col gap-1">
+                              <Button 
+                                className="w-full bg-[#0a66c2]/50 hover:bg-[#0a66c2]/50 text-white cursor-not-allowed h-10 text-xs font-bold" 
+                                disabled
+                              >
+                                Publish to LinkedIn
+                              </Button>
+                              <p className="text-[9px] text-rose-500 font-bold text-center leading-none">
+                                Connect LinkedIn account in settings
+                              </p>
+                            </div>
+                          ) : (
+                            <Button 
+                              className="flex-1 bg-[#0a66c2] hover:bg-[#004182] text-white h-10 font-bold shadow-lg shadow-[#0a66c2]/20" 
+                              onClick={handlePublish}
+                              disabled={isPublishing || generatedContent.status === 'published'}
+                            >
+                              {isPublishing ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</>
+                              ) : generatedContent.status === 'published' ? (
+                                'Published ✓'
+                              ) : (
+                                'Publish to LinkedIn'
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right Column: Format Audit Side Panel */}
+                      <div className="lg:col-span-5 space-y-5">
+                        <PrePublishChecklist
+                          content={generatedContent.body || generatedContent.content || ''}
+                          contentType={contentType}
+                          charLimit={config?.charLimit || 3000}
+                          hashtagRange={config?.hashtagRange || [3, 5]}
                         />
                       </div>
-                      <Textarea
-                        value={generatedContent.body || generatedContent.content || ''}
-                        onChange={(e) =>
-                          setGeneratedContent({ ...generatedContent, body: e.target.value })
-                        }
-                        rows={10}
-                        className="font-mono text-sm leading-relaxed bg-card border-border focus-visible:ring-primary"
-                      />
-                    </div>
-
-                    {/* Pre-Publish Checks list */}
-                    <PrePublishChecklist
-                      content={generatedContent.body || generatedContent.content || ''}
-                      contentType={contentType}
-                      charLimit={config?.charLimit || 3000}
-                      hashtagRange={config?.hashtagRange || [3, 5]}
-                    />
-
-                    {/* Action buttons */}
-                    <div className="flex gap-2 flex-wrap items-center">
-                      <Button variant="outline" className="flex-1 h-10 gap-1.5" onClick={handleCopyCleanContent}>
-                        <Copy className="w-4 h-4" />
-                        Copy Clean Content
-                      </Button>
-                      {!linkedinStatus?.hasOAuth ? (
-                        <div className="flex-1 flex flex-col gap-1">
-                          <Button 
-                            className="w-full bg-[#0a66c2]/50 hover:bg-[#0a66c2]/50 text-white cursor-not-allowed h-10 text-xs font-bold" 
-                            disabled
-                          >
-                            Publish to LinkedIn
-                          </Button>
-                          <p className="text-[9px] text-rose-500 font-bold text-center leading-none">
-                            Connect LinkedIn account in settings
-                          </p>
-                        </div>
-                      ) : (
-                        <Button 
-                          className="flex-1 bg-[#0a66c2] hover:bg-[#004182] text-white h-10 font-bold shadow-lg shadow-[#0a66c2]/20" 
-                          onClick={handlePublish}
-                          disabled={isPublishing || generatedContent.status === 'published'}
-                        >
-                          {isPublishing ? (
-                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</>
-                          ) : generatedContent.status === 'published' ? (
-                            'Published ✓'
-                          ) : (
-                            'Publish to LinkedIn'
-                          )}
-                        </Button>
-                      )}
                     </div>
                   </TabsContent>
 

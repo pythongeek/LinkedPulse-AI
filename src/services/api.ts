@@ -99,3 +99,8 @@ export const linkedinApi = {
   getStatus: () => api.get('/auth/linkedin/status'),
   getOAuthUrl: () => api.get('/auth/linkedin/login'),
 };
+
+// System API
+export const systemApi = {
+  getHealth: () => api.get('/health'),
+};

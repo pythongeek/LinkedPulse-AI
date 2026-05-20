@@ -58,6 +58,12 @@ model Topic {
   lastAnalyzed      DateTime? @map("last_analyzed")
   createdAt         DateTime @default(now()) @map("created_at")
   
+  // New research tracking fields
+  serpApiData        Json?    @map("serp_api_data")       // Real trends data
+  communitySignal    Json?    @map("community_signal")    // Reddit/community proxy signal
+  dataLastRefreshed  DateTime? @map("data_last_refreshed")
+  isEstimated        Boolean  @default(true) @map("is_estimated")
+
   // Relations
   contents    Content[]
   competitors CompetitorPost[]
@@ -100,6 +106,14 @@ model Content {
   pollDuration      String?  @map("poll_duration")
   articleTitle      String?  @map("article_title")
   articleExcerpt    String?  @map("article_excerpt")
+
+  // New research quality & verification fields
+  researchQuality    Int?     @map("research_quality")    // 0-100
+  dataSourceCount    Int?     @map("data_source_count")   // how many real sources
+  isAiGrounded       Boolean  @default(false) @map("is_ai_grounded")
+  topicSignal        Json?    @map("topic_signal")        // Reddit/community data
+  engagementActual   Json?    @map("engagement_actual")   // Real post performance
+  publishedUrn       String?  @map("published_urn")       // LinkedIn post URN
 
   // Relations
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -248,4 +262,15 @@ model QueuedJob {
   updatedAt         DateTime  @updatedAt
   
   @@map("queued_jobs")
+}
+
+model ApiHealthLog {
+  id            String   @id @default(uuid())
+  apiName       String   @map("api_name")
+  isAvailable   Boolean  @map("is_available")
+  responseTimeMs Int?    @map("response_time_ms")
+  errorCode     String?  @map("error_code")
+  checkedAt     DateTime @default(now()) @map("checked_at")
+  
+  @@map("api_health_logs")
 }

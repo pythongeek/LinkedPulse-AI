@@ -105,6 +105,9 @@ router.get('/tick', async (req, res) => {
                 pollDuration: options.pollDuration || null,
                 articleTitle: genResult.articleTitle || null,
                 articleExcerpt: genResult.articleExcerpt || null,
+                researchQuality: genResult.researchQuality || null,
+                dataSourceCount: genResult.dataSourceCount || null,
+                isAiGrounded: genResult.isAiGrounded ?? false,
               },
             });
 

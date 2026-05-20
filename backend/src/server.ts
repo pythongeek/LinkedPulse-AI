@@ -73,10 +73,18 @@ app.use((req, res, next) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const { getApiCapabilities } = require('./utils/apiAvailability');
+  const capabilities = getApiCapabilities();
+  
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: '2.0.0',
+    capabilities,
+    dataMode: capabilities.degradationLevel,
+    warning: capabilities.degradationLevel === 'ai-only' 
+      ? 'Running in AI-only mode. Configure Gemini API key for real search grounding data.' 
+      : null,
     services: {
       database: 'connected',
     },
