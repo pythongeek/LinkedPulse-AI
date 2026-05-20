@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npx prisma generate --schema=./backend/prisma/schema.prisma && vite build",
+  "buildCommand": "npx prisma generate --schema=./backend/prisma/schema.prisma && npx prisma db push --schema=./backend/prisma/schema.prisma --accept-data-loss && vite build",
   "installCommand": "npm install",
   "rewrites": [
     {
