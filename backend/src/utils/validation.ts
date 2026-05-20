@@ -31,6 +31,17 @@ export const contentGenerationSchema = z.object({
   customInstructions: z.string().optional(),
   keywords: z.array(z.string()).optional(),
   targetAudience: z.string().optional(),
+  // Per-content-type options
+  hookFormula: z.enum(['question', 'contrarian', 'statistic', 'story', 'bold_claim']).optional(),
+  slideCount: z.number().min(5).max(15).optional(),
+  pollDuration: z.enum(['1_day', '3_days', '1_week', '2_weeks']).optional(),
+  articleTargetWords: z.number().min(200).max(5000).optional(),
+  ctaType: z.enum(['comment', 'share', 'dm', 'visit_link', 'follow']).optional(),
+  toneOverride: z.string().optional(),
+  emojiBudget: z.number().min(0).max(5).optional(),
+  includeFirstComment: z.boolean().optional(),
+  linkToInclude: z.string().optional(),
+  audienceExpertiseLevel: z.enum(['beginner', 'intermediate', 'expert']).optional(),
 });
 
 // Trend analysis validation schema

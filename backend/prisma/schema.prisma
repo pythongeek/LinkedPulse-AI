@@ -89,6 +89,18 @@ model Content {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
   
+  // Structured per-content-type fields
+  slides            Json?    @map("slides")            // CarouselSlide[]
+  firstComment      String?  @map("first_comment") @db.Text
+  hookFormula       String?  @map("hook_formula")
+  charCount         Int?     @map("char_count")
+  wordCount         Int?     @map("word_count")
+  pollQuestion      String?  @map("poll_question")
+  pollOptions       Json?    @map("poll_options")      // PollOption[]
+  pollDuration      String?  @map("poll_duration")
+  articleTitle      String?  @map("article_title")
+  articleExcerpt    String?  @map("article_excerpt")
+
   // Relations
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   topic   Topic?  @relation(fields: [topicId], references: [id])

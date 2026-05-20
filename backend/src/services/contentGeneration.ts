@@ -5,6 +5,7 @@ import { PersonaService } from './personaService';
 import { ResearchService } from './researchService';
 import { TrendAnalyzer } from './trendAnalyzer';
 import { logger } from '../utils/logger';
+import { HookFormula, PollDuration, CTAType, CarouselSlide, PollOption, LINKEDIN_LIMITS } from '../types/contentTypes';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -18,6 +19,16 @@ export interface ContentGenerationOptions {
   targetAudience?: string;
   keywords?: string[];
   customInstructions?: string;
+  hookFormula?: HookFormula;
+  slideCount?: number;
+  pollDuration?: PollDuration;
+  articleTargetWords?: number;
+  ctaType?: CTAType;
+  toneOverride?: string;
+  emojiBudget?: number;
+  includeFirstComment?: boolean;
+  linkToInclude?: string;
+  audienceExpertiseLevel?: 'beginner' | 'intermediate' | 'expert';
 }
 
 export interface GeneratedContent {
@@ -34,6 +45,14 @@ export interface GeneratedContent {
   bestPostingTime: string;
   linkedinOptimization: any;
   competitiveAnalysis: any;
+  firstComment?: string;
+  slides?: CarouselSlide[];
+  pollQuestion?: string;
+  pollOptions?: PollOption[];
+  articleTitle?: string;
+  articleExcerpt?: string;
+  charCount?: number;
+  wordCount?: number;
 }
 
 export interface ContentSuggestion {
@@ -108,12 +127,12 @@ export class ContentGenerationService {
    * Phase 2: SEO & Hooks (MiniMax)
    */
   async generatePhase2(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
-    const { topic, persona, keywords } = options;
+    const { topic, contentType, persona, keywords } = options;
     const { researchData } = intermediateResult;
 
     logger.info(`[Phase 2] SEO & Hooks for: ${topic}`);
     const [seoData, hookSuggestions] = await Promise.all([
-      this.seoAgent(topic, keywords || [], researchData),
+      this.seoAgent(topic, contentType, keywords || [], researchData),
       this.hookAgent(topic, researchData, persona)
     ]);
 
@@ -125,17 +144,35 @@ export class ContentGenerationService {
   }
 
   /**
-   * Phase 3: Content Writing (MiniMax)
+   * Phase 3: Content Writing (MiniMax) — routes to specialized agents
    */
   async generatePhase3(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
-    const { topic, contentType, persona, outline, targetAudience, customInstructions } = options;
+    const {
+      topic, contentType, persona, outline, targetAudience, customInstructions,
+      hookFormula, ctaType, emojiBudget, slideCount, pollDuration,
+      articleTargetWords, linkToInclude, toneOverride, audienceExpertiseLevel,
+    } = options;
     const { researchData, seoData, hookSuggestions } = intermediateResult;
 
     logger.info(`[Phase 3] Content Writing for: ${topic}`);
-    const draft = await this.writingAgent({
-      topic, contentType, persona, outline, researchData, seoData,
+
+    const params = {
+      topic, persona, outline, researchData, seoData,
       bestHook: hookSuggestions[0], targetAudience, customInstructions,
-    });
+      hookFormula, ctaType, emojiBudget, slideCount, pollDuration,
+      articleTargetWords, linkToInclude, toneOverride, audienceExpertiseLevel,
+    };
+
+    let draft;
+    switch (contentType) {
+      case 'post':     draft = await this.writePostAgent(params); break;
+      case 'carousel': draft = await this.writeCarouselAgent(params); break;
+      case 'article':  draft = await this.writeArticleAgent(params); break;
+      case 'poll':     draft = await this.writePollAgent(params); break;
+      default:         draft = await this.writePostAgent(params);
+    }
+
+    draft = this.enforceCharacterLimits(draft, contentType);
 
     return {
       ...intermediateResult,
@@ -164,7 +201,7 @@ export class ContentGenerationService {
    * Phase 5: Visuals, Timing, Engagement (Gemini + MiniMax)
    */
   async generatePhase5(options: ContentGenerationOptions, intermediateResult: any): Promise<GeneratedContent> {
-    const { topic, contentType, persona, includeImages, targetAudience } = options;
+    const { topic, contentType, persona, includeImages, targetAudience, includeFirstComment, linkToInclude } = options;
     const { researchData, seoData, hookSuggestions, verified, competitiveAnalysis } = intermediateResult;
 
     logger.info(`[Phase 5] Final optimizations for: ${topic}`);
@@ -190,10 +227,19 @@ export class ContentGenerationService {
       this.engagementPredictorAgent(verified.content, contentType, hookSuggestions)
     ]);
 
+    // Generate first comment if requested
+    let firstComment: string | undefined;
+    if (includeFirstComment !== false) {
+      firstComment = await this.firstCommentAgent(verified, contentType, topic, linkToInclude);
+    }
+
+    // Extract content-type-specific fields from verified draft
+    const contentBody = verified.content || verified.body || verified.introText || verified.caption || '';
+
     return {
-      title: verified.title,
-      content: verified.content,
-      outline: verified.outline,
+      title: verified.title || verified.question || topic,
+      content: contentBody,
+      outline: verified.outline || verified.sections || null,
       researchData,
       sources: verified.sources,
       images,
@@ -209,6 +255,14 @@ export class ContentGenerationService {
         formattedContent: verified.formattedContent,
       },
       competitiveAnalysis,
+      firstComment,
+      slides: verified.slides || null,
+      pollQuestion: verified.question || null,
+      pollOptions: verified.options || null,
+      articleTitle: verified.articleTitle || verified.title || null,
+      articleExcerpt: verified.excerpt || null,
+      charCount: verified.charCount || (contentBody ? contentBody.length : null),
+      wordCount: verified.wordCount || (contentBody ? this.countWords(contentBody) : null),
     };
   }
 
@@ -313,14 +367,18 @@ Return JSON:
   /**
    * SEO Agent — MiniMax
    */
-  private async seoAgent(topic: string, userKeywords: string[], researchData: any): Promise<any> {
+  private async seoAgent(topic: string, contentType: string, userKeywords: string[], researchData: any): Promise<any> {
     try {
+      const hashtagRange = this.getHashtagCount(contentType);
+
       return await this.minimax.promptJSON(
         'You are a LinkedIn SEO optimization expert.',
         `Create SEO optimization for LinkedIn content about "${topic}"
 
 Context: ${JSON.stringify(researchData.keyInsights?.slice(0, 5))}
 Existing keywords: ${userKeywords.join(', ')}
+
+Generate exactly ${hashtagRange.min}-${hashtagRange.max} hashtags for this ${contentType}.
 
 Return JSON:
 {
@@ -363,63 +421,309 @@ Return ONLY a JSON array of 5 hook strings.`,
     }
   }
 
+  // ==================== SPECIALIZED WRITING AGENTS ====================
+
   /**
-   * Writing Agent — MiniMax (main content writer)
+   * Write Post Agent — MiniMax (LinkedIn text post)
    */
-  private async writingAgent(params: any): Promise<any> {
-    const { topic, contentType, persona, outline, researchData, seoData, bestHook, targetAudience, customInstructions } = params;
+  private async writePostAgent(params: any): Promise<any> {
+    const {
+      topic, persona, outline, researchData, seoData, bestHook,
+      targetAudience, customInstructions, hookFormula, ctaType,
+      emojiBudget, toneOverride, audienceExpertiseLevel,
+    } = params;
 
     try {
-      const personaContext = persona ? `Write as ${persona.name} (${persona.jobRole}). Tone: ${persona.tone}.` : 'Write as a top-tier LinkedIn creator.';
+      const personaContext = persona
+        ? `Write as ${persona.name} (${persona.jobRole}). Tone: ${toneOverride || persona.tone}.`
+        : `Write as a top-tier LinkedIn creator.${toneOverride ? ` Tone: ${toneOverride}.` : ''}`;
 
-      const systemPrompt = `You are an elite LinkedIn ghostwriter. ${personaContext}
+      const budget = emojiBudget ?? 3;
+      const cta = ctaType || 'comment';
+      const formula = hookFormula || 'bold_claim';
+      const expertise = audienceExpertiseLevel || 'intermediate';
 
-STRICT LINKEDIN FORMATTING RULES:
-1. NO DENSE BLOCKS: Paragraphs MUST be 1-3 lines maximum.
-2. SPACING: Always use a blank line between every single paragraph.
-3. HOOK: Start with a scroll-stopping hook.
-4. EMOJIS: Use a maximum of 3-5 emojis in the entire post. Keep it professional.
-5. CTA: End with a clear, engaging question or Call-To-Action.
+      const systemPrompt = `You are a world-class LinkedIn ghostwriter. You write for personal profiles using 'I' voice. ${personaContext}
 
 CRITICAL: You MUST return ONLY a valid JSON object matching the requested structure.`;
 
-      const customPrompt = customInstructions 
-        ? `CUSTOM INSTRUCTIONS / PROMPT TEMPLATE (MUST ADHERE TO THIS STYLE/STRUCTURE):
-${customInstructions}` 
+      const customPrompt = customInstructions
+        ? `\nCUSTOM INSTRUCTIONS (MUST ADHERE):\n${customInstructions}`
         : '';
 
       const result = await this.minimax.promptJSON(
         systemPrompt,
-        `Create a LinkedIn ${contentType} about "${topic}".
+        `Create a LinkedIn text post about "${topic}".
 
 USE THIS HOOK (first line): ${bestHook}
-TARGET AUDIENCE: ${targetAudience || 'Professionals'}
+TARGET AUDIENCE: ${targetAudience || 'Professionals'} (expertise: ${expertise})
 RESEARCH: ${JSON.stringify(researchData.keyInsights?.slice(0, 5))}
 SEO KEYWORDS: ${seoData.keywords?.map((k: any) => k.keyword).join(', ')}
 HASHTAGS: ${seoData.hashtags?.join(' ')}
 ${outline ? `OUTLINE: ${JSON.stringify(outline)}` : ''}
 ${customPrompt}
 
-${this.getContentTypeRequirements(contentType)}
+HOOK WINDOW: First 210 characters must stop the scroll. Use hook formula: ${formula}
+CHARACTER LIMIT: Total body ≤ 3,000 characters.
+LINE BREAK RULE: Max 3 lines per paragraph. Blank line between every paragraph.
+EMOJI BUDGET: Max ${budget} emojis. One in first line boosts impressions ~15%.
+LINKS: NEVER in post body. Links suppress reach ~40%. All links go in firstComment.
+HASHTAGS: Exactly 3-5 at the very end.
+CTA TYPE: Final paragraph uses "${cta}" CTA style.
+PERSONAL VOICE: "I" statements, specific personal experience.
+BANNED WORDS: leverage, synergy, circle back, innovative, game-changing, paradigm, disruptive, thought leader.
+
+NEGATIVE EXAMPLES (DO NOT write like this):
+- "In today's rapidly evolving landscape, it's important to leverage innovative solutions..." (too generic, uses banned words)
+- Dense paragraphs with 6+ lines and no spacing.
+
+POSITIVE STRUCTURE:
+Line 1: Hook (≤210 chars, emoji ok)
+[blank line]
+1-3 line paragraph with personal "I" insight
+[blank line]
+1-3 line paragraph with data/example
+[blank line]
+1-3 line paragraph with takeaway
+[blank line]
+CTA question
+[blank line]
+#hashtag1 #hashtag2 #hashtag3
 
 Return JSON:
 {
   "title": "Compelling title",
-  "content": "Full content with hook as first line"
-}
-
-STRICT RULE: Do NOT output any conversational text, greetings, or warnings. ONLY output the requested JSON object. If you encounter an error or missing data, still output valid JSON with your best attempt at the content.`,
-        { temperature: 0.8, maxTokens: 1000 }
+  "body": "Full post content with hook as first line",
+  "hook": "The hook text (first 210 chars)",
+  "hashtags": ["#tag1", "#tag2", "#tag3"],
+  "hookFormula": "${formula}",
+  "charCount": 0,
+  "emojiCount": 0
+}`,
+        { temperature: 0.8 }
       );
 
       return {
         ...result,
+        content: result.body,
         outline: outline || { sections: [] },
-        formattedContent: result.content
+        formattedContent: result.body,
       };
     } catch (error) {
-      logger.error('Writing agent error:', error);
-      return { title: topic, content: 'Error generating content.', outline: {}, formattedContent: '' };
+      logger.error('Write post agent error:', error);
+      return { title: topic, body: '', content: '', hook: '', hashtags: [], hookFormula: 'bold_claim', charCount: 0, emojiCount: 0, outline: {}, formattedContent: '' };
+    }
+  }
+
+  /**
+   * Write Carousel Agent — MiniMax (LinkedIn PDF carousel)
+   */
+  private async writeCarouselAgent(params: any): Promise<any> {
+    const {
+      topic, persona, outline, researchData, seoData, bestHook,
+      targetAudience, customInstructions, slideCount, ctaType,
+      toneOverride, audienceExpertiseLevel,
+    } = params;
+
+    try {
+      const personaContext = persona
+        ? `Write as ${persona.name} (${persona.jobRole}). Tone: ${toneOverride || persona.tone}.`
+        : `Write as a top-tier LinkedIn creator.${toneOverride ? ` Tone: ${toneOverride}.` : ''}`;
+
+      const slides = slideCount || 10;
+      const cta = ctaType || 'comment';
+      const expertise = audienceExpertiseLevel || 'intermediate';
+
+      const customPrompt = customInstructions
+        ? `\nCUSTOM INSTRUCTIONS (MUST ADHERE):\n${customInstructions}`
+        : '';
+
+      const result = await this.minimax.promptJSON(
+        `You are a LinkedIn carousel specialist. A carousel is a PDF document. ${personaContext}
+
+CRITICAL: You MUST return ONLY a valid JSON object matching the requested structure.`,
+        `Create a LinkedIn carousel about "${topic}".
+
+USE THIS HOOK for caption: ${bestHook}
+TARGET AUDIENCE: ${targetAudience || 'Professionals'} (expertise: ${expertise})
+RESEARCH: ${JSON.stringify(researchData.keyInsights?.slice(0, 5))}
+SEO KEYWORDS: ${seoData.keywords?.map((k: any) => k.keyword).join(', ')}
+${outline ? `OUTLINE: ${JSON.stringify(outline)}` : ''}
+${customPrompt}
+
+SLIDE COUNT: Exactly ${slides} slides.
+COVER SLIDE: Bold headline ≤ 100 chars, specific outcome promise.
+CONTENT SLIDES: One idea per slide. Headline ≤ 150 chars. Body ≤ 300 chars. ≤ 3 bullets.
+CTA SLIDE: Last slide with creator handle and specific "${cta}" action.
+CAPTION: Text post accompanying PDF, follows post rules, 3-5 hashtags.
+ZERO hashtags on actual slides.
+
+Return JSON:
+{
+  "caption": "Text post accompanying the carousel PDF",
+  "captionHashtags": ["#tag1", "#tag2", "#tag3"],
+  "slides": [
+    {"slideNumber": 1, "type": "cover", "headline": "...", "body": "..."},
+    {"slideNumber": 2, "type": "content", "headline": "...", "body": "..."},
+    {"slideNumber": ${slides}, "type": "cta", "headline": "...", "body": "..."}
+  ],
+  "firstComment": ""
+}`,
+        { temperature: 0.8 }
+      );
+
+      return {
+        ...result,
+        title: result.slides?.[0]?.headline || topic,
+        content: result.caption,
+        outline: outline || { sections: [] },
+        formattedContent: result.caption,
+      };
+    } catch (error) {
+      logger.error('Write carousel agent error:', error);
+      return { title: topic, caption: '', captionHashtags: [], slides: [], firstComment: '', content: '', outline: {}, formattedContent: '' };
+    }
+  }
+
+  /**
+   * Write Article Agent — MiniMax (LinkedIn long-form article)
+   */
+  private async writeArticleAgent(params: any): Promise<any> {
+    const {
+      topic, persona, outline, researchData, seoData, bestHook,
+      targetAudience, customInstructions, articleTargetWords, ctaType,
+      toneOverride, audienceExpertiseLevel,
+    } = params;
+
+    try {
+      const personaContext = persona
+        ? `Write as ${persona.name} (${persona.jobRole}). Tone: ${toneOverride || persona.tone}.`
+        : `Write as a top-tier LinkedIn creator.${toneOverride ? ` Tone: ${toneOverride}.` : ''}`;
+
+      const targetWords = articleTargetWords || 1500;
+      const cta = ctaType || 'comment';
+      const expertise = audienceExpertiseLevel || 'intermediate';
+
+      const customPrompt = customInstructions
+        ? `\nCUSTOM INSTRUCTIONS (MUST ADHERE):\n${customInstructions}`
+        : '';
+
+      const result = await this.minimax.promptJSON(
+        `You are a LinkedIn long-form content strategist. ${personaContext}
+
+CRITICAL: You MUST return ONLY a valid JSON object matching the requested structure.`,
+        `Create a LinkedIn article about "${topic}".
+
+USE THIS HOOK for excerpt: ${bestHook}
+TARGET AUDIENCE: ${targetAudience || 'Professionals'} (expertise: ${expertise})
+RESEARCH: ${JSON.stringify(researchData.keyInsights?.slice(0, 5))}
+SEO KEYWORDS: ${seoData.keywords?.map((k: any) => k.keyword).join(', ')}
+${outline ? `OUTLINE: ${JSON.stringify(outline)}` : ''}
+${customPrompt}
+
+TITLE: ≤ 100 chars with primary keyword, SEO title.
+EXCERPT: First 200 chars as feed card preview, secondary hook.
+STRUCTURE: H2 subheading every 200-300 words.
+LENGTH: Target ${targetWords} words. Optimal: 1200-2500.
+External links ALLOWED, no reach penalty. Include 2-3 credible sources.
+HASHTAGS: 0-3 at end.
+COVER IMAGE: Provide image generation prompt (16:9, 1920x1080).
+CTA: End with "${cta}" call-to-action.
+
+Return JSON:
+{
+  "title": "SEO-optimized title ≤ 100 chars",
+  "excerpt": "First 200 chars preview",
+  "body": "Full markdown article with ## headings",
+  "sections": [{"heading": "...", "content": "..."}],
+  "coverImagePrompt": "16:9 image prompt for...",
+  "hashtags": ["#tag1"],
+  "readingTimeMinutes": 0,
+  "wordCount": 0
+}`,
+        { temperature: 0.8, maxTokens: 4096 }
+      );
+
+      return {
+        ...result,
+        articleTitle: result.title,
+        content: result.body,
+        outline: result.sections || outline || { sections: [] },
+        formattedContent: result.body,
+      };
+    } catch (error) {
+      logger.error('Write article agent error:', error);
+      return { title: topic, excerpt: '', body: '', content: '', sections: [], coverImagePrompt: '', hashtags: [], readingTimeMinutes: 0, wordCount: 0, articleTitle: topic, outline: {}, formattedContent: '' };
+    }
+  }
+
+  /**
+   * Write Poll Agent — MiniMax (LinkedIn poll)
+   */
+  private async writePollAgent(params: any): Promise<any> {
+    const {
+      topic, persona, researchData, seoData, bestHook,
+      targetAudience, customInstructions, pollDuration, ctaType,
+      toneOverride, audienceExpertiseLevel,
+    } = params;
+
+    try {
+      const personaContext = persona
+        ? `Write as ${persona.name} (${persona.jobRole}). Tone: ${toneOverride || persona.tone}.`
+        : `Write as a top-tier LinkedIn creator.${toneOverride ? ` Tone: ${toneOverride}.` : ''}`;
+
+      const duration = pollDuration || '1_week';
+      const cta = ctaType || 'comment';
+      const expertise = audienceExpertiseLevel || 'intermediate';
+
+      const customPrompt = customInstructions
+        ? `\nCUSTOM INSTRUCTIONS (MUST ADHERE):\n${customInstructions}`
+        : '';
+
+      const result = await this.minimax.promptJSON(
+        `You are a LinkedIn engagement specialist focused on poll content. ${personaContext}
+
+CRITICAL: You MUST return ONLY a valid JSON object matching the requested structure.`,
+        `Create a LinkedIn poll about "${topic}".
+
+USE THIS HOOK for intro: ${bestHook}
+TARGET AUDIENCE: ${targetAudience || 'Professionals'} (expertise: ${expertise})
+RESEARCH: ${JSON.stringify(researchData.keyInsights?.slice(0, 5))}
+SEO KEYWORDS: ${seoData.keywords?.map((k: any) => k.keyword).join(', ')}
+${customPrompt}
+
+QUESTION: Max 140 characters. HARD LIMIT.
+OPTIONS: 2-4 options, each max 30 characters. HARD LIMIT.
+Best performing: binary yes/no, preference, self-assessment, opinion with Neither/Both.
+INTRO TEXT: Standard post rules. Set up debate. Share opinion. End with "Vote below 👇"
+FIRST COMMENT: Reveal own answer, ask others to share theirs.
+CTA: Use "${cta}" style.
+
+Return JSON:
+{
+  "question": "Poll question ≤ 140 chars",
+  "options": [
+    {"text": "Option text ≤ 30 chars", "order": 1},
+    {"text": "Option text ≤ 30 chars", "order": 2}
+  ],
+  "duration": "${duration}",
+  "introText": "Post body above the poll",
+  "introHashtags": ["#tag1", "#tag2", "#tag3"],
+  "firstComment": "Creator's answer and CTA"
+}`,
+        { temperature: 0.8 }
+      );
+
+      return {
+        ...result,
+        title: result.question,
+        content: result.introText,
+        outline: { sections: [] },
+        formattedContent: result.introText,
+      };
+    } catch (error) {
+      logger.error('Write poll agent error:', error);
+      return { question: topic, options: [], duration: '1_week', introText: '', introHashtags: [], firstComment: '', title: topic, content: '', outline: {}, formattedContent: '' };
     }
   }
 
@@ -463,30 +767,79 @@ STRICT RULE: Do NOT output any conversational text, greetings, or warnings. ONLY
 
   /**
    * Fact Check Agent — MiniMax
+   * Preserves personal narrative; only flags verifiable factual claims.
    */
   private async factCheckAgent(content: any, sources: any[]): Promise<any> {
     try {
       const result = await this.minimax.promptJSON(
-        'You are a fact-checking specialist for LinkedIn content.',
+        `Your job is ONLY to verify or flag specific factual claims. You MUST preserve all personal narrative, opinion, and storytelling completely unchanged.
+
+RULES:
+- If the content is primarily personal narrative, return the EXACT original content unchanged.
+- Only modify if a specific statistic, date, or quote is verifiably wrong.
+- If unsure about a claim, ADD "(stat unverified)" inline next to that claim.
+- NEVER replace "I" voice with third-person commentary.
+- NEVER rewrite, summarize, or paraphrase the content.
+- Return the content as-is unless a concrete factual error exists.`,
         `Fact-check this content:
 
 ${content.content}
 
 SOURCES: ${JSON.stringify(sources?.slice(0, 5))}
 
-CRITICAL INSTRUCTION: If the content is a personal anecdote, reflection, or does not contain any objective factual claims that need verification, DO NOT replace the content with commentary. You MUST return the EXACT original content unchanged.
-
 Return JSON:
 {
-  "verified": true,
-  "content": "Updated content with verified claims (OR the exact original content if no changes needed)"
-}`
+  "content": "The content with only factual corrections (or exact original if no changes needed)",
+  "factsChecked": ["list of facts that were verified"],
+  "modified": false
+}`,
+        { temperature: 0.2 }
       );
 
       return { ...content, ...result, sources, formattedContent: result.content };
     } catch (error) {
       logger.error('Fact check agent error:', error);
-      return { ...content, verified: false, sources };
+      return { ...content, verified: false, sources, factsChecked: [], modified: false };
+    }
+  }
+
+  /**
+   * First Comment Agent — MiniMax
+   * Generates a strategic first comment for the post.
+   */
+  private async firstCommentAgent(content: any, contentType: string, topic: string, linkToInclude?: string): Promise<string> {
+    try {
+      const linkInstruction = linkToInclude
+        ? `INCLUDE THIS LINK in the comment: ${linkToInclude}`
+        : 'No link to include.';
+
+      const pollInstruction = contentType === 'poll'
+        ? 'Reveal your own answer to the poll question and ask others to share theirs.'
+        : '';
+
+      const result = await this.minimax.prompt(
+        'You are a LinkedIn engagement strategist specializing in first comments.',
+        `Write a strategic first comment for this LinkedIn ${contentType} about "${topic}".
+
+MAIN CONTENT PREVIEW: ${(content.content || '').substring(0, 300)}
+HASHTAGS ALREADY USED: ${JSON.stringify(content.hashtags || content.introHashtags || content.captionHashtags || [])}
+
+RULES:
+- Max 500 characters. HARD LIMIT.
+- ${linkInstruction}
+- Add 3-5 additional hashtags NOT already used in the main post.
+- ${pollInstruction}
+- Add value: expand on a point, share a resource, or ask a follow-up question.
+- Keep the same voice and tone as the main content.
+
+Return ONLY the first comment text, nothing else.`,
+        { temperature: 0.7 }
+      );
+
+      return result.substring(0, 500);
+    } catch (error) {
+      logger.error('First comment agent error:', error);
+      return '';
     }
   }
 
@@ -577,33 +930,94 @@ Return JSON:
 
   // ==================== HELPERS ====================
 
-  private getContentTypeRequirements(contentType: string): string {
-    const requirements: Record<string, string> = {
-      post: `Structure this as a classic LinkedIn text post. 
-- Word count: 150-300 words.
-- Format: Start with a powerful 1-sentence scroll-stopping hook. Break up content with blank line spaces. Use bullet points or short lines for the core body to highlight 3-5 main key insights or takeaways. Include a maximum of 3-5 relevant emojis.
-- CTA: End with a clear, open-ended question designed to drive user comments and engagement.`,
-      carousel: `Structure this as a slide-by-slide script outline for a visual LinkedIn PDF Carousel.
-- Layout: Specify 'Slide 1' to 'Slide 10' explicitly.
-- Slide 1 (Cover): An attention-grabbing title and subtitle.
-- Slide 2 (Hook/Problem): Highlight the main pain point or question.
-- Slides 3-8 (Content/Steps): Focus on one clear, bite-sized value point or action step per slide with a bold headline and 1-2 bullet points.
-- Slide 9 (Visual Diagram/Summary): Outline a visual flowchart, comparison table, or diagram representation of the concept.
-- Slide 10 (Call-To-Action): A concluding slide asking the reader to like, share, comment, or swipe.`,
-      article: `Structure this as a professional deep-dive LinkedIn Article/Newsletter.
-- Word count: 800-1200 words.
-- Layout: Write in a structured narrative format with an engaging title, introductory hook, and clear subsections.
-- Headings: Use '## Heading' markdown formats to separate the main sections.
-- Content: Incorporate statistics, quotes, or case studies. Break up long text paragraphs to maintain online readability.
-- Summary: End with a solid conclusion summarizing key takeaways and a final prompt for professional networking discussion.`,
-      poll: `Structure this as an interactive LinkedIn Poll to maximize community dialogue.
-- Intro: Write a 2-3 sentence introductory hook sharing a debate, trend, or common question.
-- Poll Question: State a clear, singular question that users can vote on.
-- Options: Provide exactly 3 or 4 distinct, mutually exclusive choices. Clearly label them as 'Option A:', 'Option B:', etc.
-- Engagement: Ask users to vote and leave their detailed thoughts or reasoning in the comments section.`,
+  /**
+   * Enforce LinkedIn character limits on generated output.
+   */
+  private enforceCharacterLimits(output: any, contentType: string): any {
+    switch (contentType) {
+      case 'post': {
+        if (output.body && output.body.length > LINKEDIN_LIMITS.post.maxChars) {
+          output.body = this.truncateAtSentence(output.body, LINKEDIN_LIMITS.post.maxChars);
+          output.content = output.body;
+          output.formattedContent = output.body;
+        }
+        output.charCount = output.body?.length || 0;
+        break;
+      }
+      case 'poll': {
+        if (output.question && output.question.length > LINKEDIN_LIMITS.poll.questionMaxChars) {
+          output.question = output.question.substring(0, LINKEDIN_LIMITS.poll.questionMaxChars);
+        }
+        if (output.options && Array.isArray(output.options)) {
+          output.options = output.options.map((opt: any) => ({
+            ...opt,
+            text: opt.text?.substring(0, LINKEDIN_LIMITS.poll.optionMaxChars) || opt.text,
+          }));
+        }
+        break;
+      }
+      case 'carousel': {
+        if (output.slides && Array.isArray(output.slides)) {
+          output.slides = output.slides.map((slide: any) => ({
+            ...slide,
+            headline: slide.headline?.length > LINKEDIN_LIMITS.carousel.headlineMaxChars
+              ? slide.headline.substring(0, LINKEDIN_LIMITS.carousel.headlineMaxChars)
+              : slide.headline,
+          }));
+        }
+        break;
+      }
+      case 'article': {
+        if (output.title && output.title.length > LINKEDIN_LIMITS.article.titleMaxChars) {
+          output.title = output.title.substring(0, LINKEDIN_LIMITS.article.titleMaxChars);
+          output.articleTitle = output.title;
+        }
+        if (output.excerpt && output.excerpt.length > LINKEDIN_LIMITS.article.excerptMaxChars) {
+          output.excerpt = this.truncateAtSentence(output.excerpt, LINKEDIN_LIMITS.article.excerptMaxChars);
+        }
+        break;
+      }
+    }
+    return output;
+  }
+
+  /**
+   * Truncate text at the last sentence boundary before maxLen.
+   */
+  private truncateAtSentence(text: string, maxLen: number): string {
+    if (text.length <= maxLen) return text;
+
+    const truncated = text.substring(0, maxLen);
+    const lastSentenceEnd = Math.max(
+      truncated.lastIndexOf('.'),
+      truncated.lastIndexOf('!'),
+      truncated.lastIndexOf('?')
+    );
+
+    if (lastSentenceEnd > 0) {
+      return truncated.substring(0, lastSentenceEnd + 1);
+    }
+    return truncated;
+  }
+
+  /**
+   * Get type-specific hashtag count ranges.
+   */
+  private getHashtagCount(contentType: string): { min: number; max: number } {
+    const counts: Record<string, { min: number; max: number }> = {
+      post: { min: 3, max: 5 },
+      carousel: { min: 3, max: 5 },
+      article: { min: 0, max: 3 },
+      poll: { min: 3, max: 5 },
     };
-    return `FORMAT & STRUCTURE RULES:
-${requirements[contentType] || requirements.post}`;
+    return counts[contentType] || counts.post;
+  }
+
+  /**
+   * Count words in a text string.
+   */
+  private countWords(text: string): number {
+    return text.trim().split(/\s+/).filter(w => w.length > 0).length;
   }
 
   /**

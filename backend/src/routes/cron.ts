@@ -94,6 +94,17 @@ router.get('/tick', async (req, res) => {
                 bestPostingTime: genResult.bestPostingTime,
                 linkedinOptimization: genResult.linkedinOptimization,
                 competitiveAnalysis: genResult.competitiveAnalysis,
+                // Structured output fields
+                slides: (genResult.slides || null) as any,
+                firstComment: genResult.firstComment || null,
+                hookFormula: options.hookFormula || null,
+                charCount: genResult.charCount || null,
+                wordCount: genResult.wordCount || null,
+                pollQuestion: genResult.pollQuestion || null,
+                pollOptions: (genResult.pollOptions || null) as any,
+                pollDuration: options.pollDuration || null,
+                articleTitle: genResult.articleTitle || null,
+                articleExcerpt: genResult.articleExcerpt || null,
               },
             });
 

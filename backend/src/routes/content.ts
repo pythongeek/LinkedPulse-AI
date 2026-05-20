@@ -24,7 +24,17 @@ router.post('/generate', authenticate, validateBody(contentGenerationSchema), as
       includeImages,
       customInstructions,
       keywords,
-      targetAudience
+      targetAudience,
+      hookFormula,
+      slideCount,
+      pollDuration,
+      articleTargetWords,
+      ctaType,
+      toneOverride,
+      emojiBudget,
+      includeFirstComment,
+      linkToInclude,
+      audienceExpertiseLevel,
     } = req.body;
     const userId = req.user!.id;
 
@@ -56,6 +66,16 @@ router.post('/generate', authenticate, validateBody(contentGenerationSchema), as
         customInstructions,
         keywords,
         targetAudience,
+        hookFormula,
+        slideCount,
+        pollDuration,
+        articleTargetWords,
+        ctaType,
+        toneOverride,
+        emojiBudget,
+        includeFirstComment,
+        linkToInclude,
+        audienceExpertiseLevel,
       }
     });
 
