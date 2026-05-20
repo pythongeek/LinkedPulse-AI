@@ -220,6 +220,10 @@ export default function ContentStudio() {
     toast.success('Clean formatting copied to clipboard!');
   };
 
+  const handleRegenerateHook = () => {
+    toast.info('Hook suggestions are regenerated during draft generation. Please click "Generate Draft" to refresh suggestions.');
+  };
+
   const getEngagementColor = (score: number) => {
     if (score >= 80) return 'text-green-500 bg-green-500/10 border-green-500/20';
     if (score >= 60) return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
