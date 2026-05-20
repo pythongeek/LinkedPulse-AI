@@ -413,8 +413,42 @@ router.post('/:id/publish', authenticate, async (req, res) => {
     }
 
     // Determine the text to publish
-    const textToPublish = content.body || (content as any).content;
-    if (!textToPublish) {
+    let textToPublish = content.body || (content as any).content || '';
+
+    // Format poll for publication if it is a poll
+    if (content.contentType === 'poll' && content.pollQuestion) {
+      const options = content.pollOptions as any;
+      let optionsText = '';
+      if (Array.isArray(options)) {
+        const numberEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+        optionsText = options
+          .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+          .map((opt: any, index: number) => {
+            const emoji = numberEmojis[index] || '🔹';
+            return `${emoji} ${opt.text}`;
+          })
+          .join('\n');
+      }
+      textToPublish = `${textToPublish}\n\n📊 POLL:\n❓ ${content.pollQuestion}\n\n${optionsText}\n\n👇 Vote by replying with your choice in the comments!`;
+    }
+
+    // Format carousel for publication if it is a carousel
+    if (content.contentType === 'carousel' && content.slides) {
+      const slidesList = content.slides as any;
+      if (Array.isArray(slidesList) && slidesList.length > 0) {
+        const slidesText = slidesList
+          .sort((a: any, b: any) => (a.slideNumber || 0) - (b.slideNumber || 0))
+          .map((slide: any) => {
+            const slideHeader = `Slide ${slide.slideNumber}: ${slide.headline}`;
+            const slideBody = slide.body ? `\n   ${slide.body}` : '';
+            return `${slideHeader}${slideBody}`;
+          })
+          .join('\n\n');
+        textToPublish = `${textToPublish}\n\n📖 CAROUSEL SLIDES OUTLINE:\n\n${slidesText}`;
+      }
+    }
+
+    if (!textToPublish.trim()) {
       return res.status(400).json({
         error: {
           message: 'Content body is empty',
@@ -446,6 +480,16 @@ router.post('/:id/publish', authenticate, async (req, res) => {
     const { LinkedInPublisher } = await import('../services/linkedinPublisher.js');
     
     const postUrn = await LinkedInPublisher.publishText(textToPublish, accessToken);
+
+    // If firstComment exists, publish it as a comment to the post URN
+    if (content.firstComment) {
+      try {
+        await LinkedInPublisher.publishComment(postUrn, content.firstComment, accessToken);
+        logger.info(`Strategic first comment published automatically for post: ${postUrn}`);
+      } catch (commentError) {
+        logger.error(`Failed to publish automatic first comment for ${postUrn}:`, commentError);
+      }
+    }
 
     // Update content status
     const updatedContent = await prisma.content.update({

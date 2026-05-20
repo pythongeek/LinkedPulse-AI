@@ -68,4 +68,41 @@ export class LinkedInPublisher {
       throw new Error(`LinkedIn API Error: ${error.response?.data?.message || error.message}`);
     }
   }
+
+  /**
+   * Publish a comment to a LinkedIn post
+   */
+  static async publishComment(
+    postUrn: string,
+    commentText: string,
+    accessToken: string,
+    authorUrn?: string
+  ): Promise<string> {
+    try {
+      const urn = authorUrn || await this.getAuthorUrn(accessToken);
+
+      const payload = {
+        actor: urn,
+        message: {
+          text: commentText,
+        },
+      };
+
+      const encodedPostUrn = encodeURIComponent(postUrn);
+      const url = `https://api.linkedin.com/v2/socialActions/${encodedPostUrn}/comments`;
+
+      const response = await axios.post(url, payload, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data.id;
+    } catch (error: any) {
+      logger.error('Failed to publish comment to LinkedIn', error.response?.data || error.message);
+      throw new Error(`LinkedIn Comment API Error: ${error.response?.data?.message || error.message}`);
+    }
+  }
 }
