@@ -760,11 +760,17 @@ Return JSON:
         ? `Adhere to these style constraints/templates if provided: ${customInstructions}`
         : '';
 
+      const draftContent = draft.content || draft.caption || draft.introText || draft.body || '';
+      
+      if (!draftContent) {
+        return draft;
+      }
+
       const result = await this.minimax.promptJSON(
         'You are a LinkedIn content editor specializing in maximum engagement.',
         `Edit this LinkedIn ${contentType} for MAXIMUM engagement:
 
-CONTENT: ${draft.content}
+CONTENT: ${draftContent}
 
 Tasks & STRICT RULES:
 1. NO DENSE BLOCKS: Break up long paragraphs. Max 1-3 lines per paragraph.

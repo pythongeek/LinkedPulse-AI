@@ -414,6 +414,9 @@ router.post('/:id/publish', authenticate, async (req, res) => {
 
     // Determine the text to publish
     let textToPublish = content.body || (content as any).content || '';
+    if (textToPublish === 'undefined') {
+      textToPublish = '';
+    }
 
     // Format poll for publication if it is a poll
     if (content.contentType === 'poll' && content.pollQuestion) {
@@ -429,7 +432,8 @@ router.post('/:id/publish', authenticate, async (req, res) => {
           })
           .join('\n');
       }
-      textToPublish = `${textToPublish}\n\n📊 POLL:\n❓ ${content.pollQuestion}\n\n${optionsText}\n\n👇 Vote by replying with your choice in the comments!`;
+      const prefix = textToPublish.trim() ? `${textToPublish}\n\n` : '';
+      textToPublish = `${prefix}📊 POLL:\n❓ ${content.pollQuestion}\n\n${optionsText}\n\n👇 Vote by replying with your choice in the comments!`;
     }
 
     // Format carousel for publication if it is a carousel
@@ -444,7 +448,8 @@ router.post('/:id/publish', authenticate, async (req, res) => {
             return `${slideHeader}${slideBody}`;
           })
           .join('\n\n');
-        textToPublish = `${textToPublish}\n\n📖 CAROUSEL SLIDES OUTLINE:\n\n${slidesText}`;
+        const prefix = textToPublish.trim() ? `${textToPublish}\n\n` : '';
+        textToPublish = `${prefix}📖 CAROUSEL SLIDES OUTLINE:\n\n${slidesText}`;
       }
     }
 
