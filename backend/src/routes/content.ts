@@ -484,7 +484,42 @@ router.post('/:id/publish', authenticate, async (req, res) => {
     // Import dynamically to avoid circular dependencies if any
     const { LinkedInPublisher } = await import('../services/linkedinPublisher.js');
     
-    const postUrn = await LinkedInPublisher.publishText(textToPublish, accessToken);
+    let postUrn = '';
+    
+    const hasImage = Array.isArray(content.images) && content.images.length > 0 && typeof content.images[0] === 'string' && content.images[0].trim() !== '';
+
+    if (hasImage) {
+      try {
+        const imageUrlOrBase64 = (content.images as string[])[0];
+        let imageBuffer: Buffer;
+        
+        if (imageUrlOrBase64.startsWith('data:image')) {
+          // Parse base64
+          const base64Data = imageUrlOrBase64.split(',')[1];
+          imageBuffer = Buffer.from(base64Data, 'base64');
+        } else {
+          // Download image from URL
+          const axios = (await import('axios')).default;
+          const imageRes = await axios.get(imageUrlOrBase64, { responseType: 'arraybuffer' });
+          imageBuffer = Buffer.from(imageRes.data);
+        }
+
+        // 1. Register Upload
+        const { uploadUrl, assetUrn } = await LinkedInPublisher.registerImageUpload(accessToken);
+        
+        // 2. Upload binary
+        await LinkedInPublisher.uploadImageBinary(uploadUrl, imageBuffer, accessToken);
+        
+        // 3. Publish post with image
+        postUrn = await LinkedInPublisher.publishImage(textToPublish, assetUrn, accessToken);
+      } catch (imageUploadError) {
+        logger.error('Failed to upload and publish image, falling back to text post', imageUploadError);
+        // Fallback to text
+        postUrn = await LinkedInPublisher.publishText(textToPublish, accessToken);
+      }
+    } else {
+      postUrn = await LinkedInPublisher.publishText(textToPublish, accessToken);
+    }
 
     // If firstComment exists, publish it as a comment to the post URN
     if (content.firstComment) {
@@ -518,6 +553,53 @@ router.post('/:id/publish', authenticate, async (req, res) => {
       error: {
         message: error.message || 'Failed to publish content to LinkedIn',
         code: 'PUBLISH_ERROR',
+      },
+    });
+  }
+});
+
+/**
+ * Regenerate image for content
+ * POST /api/content/:id/image/regenerate
+ */
+router.post('/:id/image/regenerate', authenticate, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    const { prompt } = req.body;
+
+    const content = await prisma.content.findFirst({
+      where: { id, userId: req.user!.id },
+    });
+
+    if (!content) {
+      return res.status(404).json({
+        error: { message: 'Content not found', code: 'NOT_FOUND' },
+      });
+    }
+
+    const { ImageGenerationService } = await import('../services/imageGeneration.js');
+    const imageGen = new ImageGenerationService();
+    
+    // Generate new images
+    const images = await imageGen.generateImages(prompt || content.title || 'LinkedIn professional image', 'professional', 1, '16:9');
+    
+    const updatedContent = await prisma.content.update({
+      where: { id },
+      data: {
+        images: images,
+      },
+    });
+
+    res.json({
+      message: 'Image regenerated successfully',
+      content: updatedContent,
+    });
+  } catch (error) {
+    logger.error('Regenerate image error:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to regenerate image',
+        code: 'IMAGE_GENERATION_ERROR',
       },
     });
   }

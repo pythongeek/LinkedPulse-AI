@@ -15,9 +15,10 @@ interface LinkedInPreviewProps {
   articleExcerpt?: string | null;
 }
 
-export const LinkedInPreview: React.FC<LinkedInPreviewProps> = ({
+export const LinkedInPreview: React.FC<LinkedInPreviewProps & { images?: string[] }> = ({
   content = '',
   contentType,
+  images = [],
   slides,
   pollQuestion,
   pollOptions,
@@ -175,6 +176,21 @@ export const LinkedInPreview: React.FC<LinkedInPreviewProps> = ({
               linkedin.com • 5 min read
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Feature Image Embed */}
+      {images && images.length > 0 && typeof images[0] === 'string' && images[0].trim() !== '' && (
+        <div className="mx-0 mt-2 mb-0">
+          <img 
+            src={images[0]} 
+            alt="Feature Image" 
+            className="w-full object-cover max-h-[500px]" 
+            onError={(e) => {
+              // Hide image if it fails to load
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
         </div>
       )}
 

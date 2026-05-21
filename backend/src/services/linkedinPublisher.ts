@@ -105,4 +105,105 @@ export class LinkedInPublisher {
       throw new Error(`LinkedIn Comment API Error: ${error.response?.data?.message || error.message}`);
     }
   }
+  /**
+   * Register an image upload with LinkedIn Assets API
+   */
+  static async registerImageUpload(accessToken: string, authorUrn?: string): Promise<{ uploadUrl: string; assetUrn: string }> {
+    try {
+      const urn = authorUrn || await this.getAuthorUrn(accessToken);
+
+      const payload = {
+        registerUploadRequest: {
+          recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+          owner: urn,
+          serviceRelationships: [
+            {
+              relationshipType: 'OWNER',
+              identifier: 'urn:li:userGeneratedContent',
+            },
+          ],
+        },
+      };
+
+      const response = await axios.post('https://api.linkedin.com/v2/assets?action=registerUpload', payload, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const uploadUrl = response.data.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
+      const assetUrn = response.data.value.asset;
+
+      return { uploadUrl, assetUrn };
+    } catch (error: any) {
+      logger.error('Failed to register LinkedIn image upload', error.response?.data || error.message);
+      throw new Error(`LinkedIn Assets API Error: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  /**
+   * Upload image binary to the provided uploadUrl
+   */
+  static async uploadImageBinary(uploadUrl: string, imageBuffer: Buffer, accessToken: string): Promise<void> {
+    try {
+      await axios.put(uploadUrl, imageBuffer, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/octet-stream',
+        },
+      });
+    } catch (error: any) {
+      logger.error('Failed to upload image binary to LinkedIn', error.response?.data || error.message);
+      throw new Error(`LinkedIn Image Upload Error: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  /**
+   * Publish a text post with an attached image via UGC API
+   */
+  static async publishImage(text: string, assetUrn: string, accessToken: string, authorUrn?: string): Promise<string> {
+    try {
+      const urn = authorUrn || await this.getAuthorUrn(accessToken);
+
+      const payload = {
+        author: urn,
+        lifecycleState: 'PUBLISHED',
+        specificContent: {
+          'com.linkedin.ugc.ShareContent': {
+            shareCommentary: {
+              text: text,
+            },
+            shareMediaCategory: 'IMAGE',
+            media: [
+              {
+                status: 'READY',
+                description: {
+                  text: 'Image',
+                },
+                media: assetUrn,
+              },
+            ],
+          },
+        },
+        visibility: {
+          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+        },
+      };
+
+      const response = await axios.post('https://api.linkedin.com/v2/ugcPosts', payload, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data.id; // Returns the URN of the published post
+    } catch (error: any) {
+      logger.error('Failed to publish image post to LinkedIn', error.response?.data || error.message);
+      throw new Error(`LinkedIn API Error: ${error.response?.data?.message || error.message}`);
+    }
+  }
 }

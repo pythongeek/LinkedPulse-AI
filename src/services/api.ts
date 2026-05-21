@@ -46,6 +46,7 @@ export const contentApi = {
   delete: (id: string) => api.delete(`/content/${id}`),
   getSuggestions: (data: any) => api.post('/content/suggestions', data),
   publish: (id: string) => api.post(`/content/${id}/publish`),
+  regenerateImage: (id: string, data?: any) => api.post(`/content/${id}/image/regenerate`, data),
 };
 
 // Job API

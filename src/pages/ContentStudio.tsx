@@ -220,6 +220,65 @@ export default function ContentStudio() {
     toast.success('Clean formatting copied to clipboard!');
   };
 
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [isRegeneratingImage, setIsRegeneratingImage] = useState(false);
+
+  useEffect(() => {
+    if (generatedContent?.imagePrompts?.[0]) {
+      setImagePrompt(generatedContent.imagePrompts[0]);
+    }
+  }, [generatedContent?.imagePrompts]);
+
+  const handleRegenerateImage = async () => {
+    if (!generatedContent?.id) return;
+    setIsRegeneratingImage(true);
+    try {
+      const res = await contentApi.regenerateImage(generatedContent.id, { prompt: imagePrompt });
+      setGeneratedContent(res.data.content);
+      toast.success('Image regenerated successfully!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to regenerate image');
+    } finally {
+      setIsRegeneratingImage(false);
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (!generatedContent?.id) return;
+    try {
+      const updated = { ...generatedContent, images: [] };
+      await contentApi.update(generatedContent.id, updated);
+      setGeneratedContent(updated);
+      toast.success('Image removed from post');
+    } catch (error: any) {
+      toast.error('Failed to remove image');
+    }
+  };
+
+  const handleUploadCustomImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      try {
+        const updated = { ...generatedContent, images: [base64] };
+        await contentApi.update(generatedContent.id!, updated);
+        setGeneratedContent(updated);
+        toast.success('Custom image uploaded!');
+      } catch (error) {
+        toast.error('Failed to save custom image');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleRegenerateHook = () => {
     toast.info('Hook suggestions are regenerated during draft generation. Please click "Generate Draft" to refresh suggestions.');
   };
@@ -593,18 +652,21 @@ export default function ContentStudio() {
               )}
               {generatedContent ? (
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-6 mb-5 bg-secondary/40 p-1 rounded-xl">
-                    <TabsTrigger className="rounded-lg text-xs" value="content">Content</TabsTrigger>
-                    <TabsTrigger className="rounded-lg text-xs" value="slides" disabled={contentType !== 'carousel'}>
-                      Slides
-                    </TabsTrigger>
-                    <TabsTrigger className="rounded-lg text-xs" value="hooks">Hooks</TabsTrigger>
-                    <TabsTrigger className="rounded-lg text-xs" value="optimize">Optimize</TabsTrigger>
-                    <TabsTrigger className="rounded-lg text-xs" value="sources">Sources</TabsTrigger>
-                    <TabsTrigger className="rounded-lg text-xs" value="first-comment" disabled={!generatedContent.firstComment}>
-                      First Cmmt
-                    </TabsTrigger>
-                  </TabsList>
+                    <TabsList className="grid w-full grid-cols-7 mb-5 bg-secondary/40 p-1 rounded-xl">
+                      <TabsTrigger className="rounded-lg text-xs" value="content">Content</TabsTrigger>
+                      <TabsTrigger className="rounded-lg text-xs" value="slides" disabled={contentType !== 'carousel'}>
+                        Slides
+                      </TabsTrigger>
+                      <TabsTrigger className="rounded-lg text-xs" value="hooks">Hooks</TabsTrigger>
+                      <TabsTrigger className="rounded-lg text-xs" value="optimize">Optimize</TabsTrigger>
+                      <TabsTrigger className="rounded-lg text-xs" value="sources">Sources</TabsTrigger>
+                      <TabsTrigger className="rounded-lg text-xs" value="image" disabled={!generatedContent.images || generatedContent.images.length === 0}>
+                        Image
+                      </TabsTrigger>
+                      <TabsTrigger className="rounded-lg text-xs" value="first-comment" disabled={!generatedContent.firstComment}>
+                        First Cmmt
+                      </TabsTrigger>
+                    </TabsList>
 
                   {/* 1. Main Content Tab */}
                   <TabsContent value="content" className="space-y-5 focus-visible:outline-none">
@@ -906,6 +968,63 @@ export default function ContentStudio() {
                       <Copy className="w-4 h-4" />
                       Copy First Comment
                     </Button>
+                  </TabsContent>
+                  {/* 7. Feature Image Tab */}
+                  <TabsContent value="image" className="space-y-4 focus-visible:outline-none">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-xs font-semibold">Post Feature Image</Label>
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          className="h-7 px-2 text-[10px]"
+                          onClick={handleRemoveImage}
+                        >
+                          Remove Image
+                        </Button>
+                      </div>
+
+                      {generatedContent.images?.[0] ? (
+                        <div className="rounded-xl overflow-hidden border border-border bg-card/50">
+                          <img 
+                            src={generatedContent.images[0]} 
+                            alt="Feature" 
+                            className="w-full object-contain max-h-[300px]" 
+                          />
+                        </div>
+                      ) : (
+                        <div className="p-10 border border-dashed border-border rounded-xl text-center text-muted-foreground text-xs">
+                          No image generated.
+                        </div>
+                      )}
+
+                      <div className="space-y-2 pt-2 border-t border-border/40">
+                        <Label className="text-xs font-semibold">Regenerate with AI (Gemini 2.5 Flash Prompt)</Label>
+                        <Textarea 
+                          value={imagePrompt}
+                          onChange={(e) => setImagePrompt(e.target.value)}
+                          className="font-mono text-[11px] leading-relaxed bg-card border-border min-h-[80px]"
+                        />
+                        <Button 
+                          onClick={handleRegenerateImage}
+                          disabled={isRegeneratingImage || !imagePrompt}
+                          className="w-full text-xs h-9 bg-primary/90 hover:bg-primary text-primary-foreground"
+                        >
+                          {isRegeneratingImage ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+                          Regenerate Image
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2 pt-2 border-t border-border/40">
+                        <Label className="text-xs font-semibold">Or Upload Custom Image</Label>
+                        <Input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleUploadCustomImage} 
+                          className="text-xs file:bg-primary/10 file:text-primary file:border-0 file:rounded-md file:px-2 file:py-1 file:text-[10px] file:font-semibold"
+                        />
+                      </div>
+                    </div>
                   </TabsContent>
                 </Tabs>
               ) : (
