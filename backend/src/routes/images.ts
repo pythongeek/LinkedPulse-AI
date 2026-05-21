@@ -20,6 +20,7 @@ router.post('/generate', authenticate, validateBody(imageGenerationSchema), asyn
 
     const imageService = new ImageGenerationService();
     let images: string[];
+    let promptToReturn = prompt;
 
     if (personaId || purpose) {
       // New LinkedIn-spec path: persona-aware, purpose-driven
@@ -28,6 +29,27 @@ router.post('/generate', authenticate, validateBody(imageGenerationSchema), asyn
         persona = await prisma.persona.findFirst({ where: { id: personaId, userId } });
       }
       const imagePurpose = (purpose as any) || 'feed_post';
+      
+      const promptEngine = new LinkedInImagePromptEngine();
+      const structuredPrompt = promptEngine.buildPrompt(
+        prompt,
+        imagePurpose,
+        persona,
+        undefined,
+        hookFormula,
+        campaignId
+      );
+
+      if (count === 0) {
+        return res.json({
+          images: [],
+          prompt: structuredPrompt.primaryPrompt,
+          style,
+          purpose: imagePurpose,
+          provider: 'chain',
+        });
+      }
+
       images = await imageService.generateLinkedInImage(
         prompt,
         imagePurpose,
@@ -37,6 +59,9 @@ router.post('/generate', authenticate, validateBody(imageGenerationSchema), asyn
         campaignId,
         count
       );
+      
+      // Override prompt with the generated one so client can see it
+      promptToReturn = structuredPrompt.primaryPrompt;
     } else {
       // Legacy path
       images = await imageService.generateImages(prompt, style, count, aspectRatio);
@@ -49,7 +74,7 @@ router.post('/generate', authenticate, validateBody(imageGenerationSchema), asyn
 
     res.json({
       images,
-      prompt,
+      prompt: promptToReturn,
       style,
       purpose: purpose || 'legacy',
       provider: 'chain',

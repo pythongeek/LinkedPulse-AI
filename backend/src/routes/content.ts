@@ -580,8 +580,26 @@ router.post('/:id/image/regenerate', authenticate, async (req, res) => {
     const { ImageGenerationService } = await import('../services/imageGeneration.js');
     const imageGen = new ImageGenerationService();
     
-    // Generate new images
-    const images = await imageGen.generateImages(prompt || content.title || 'LinkedIn professional image', 'professional', 1, '16:9');
+    // Check for persona
+    const persona = content.personaId 
+      ? await prisma.persona.findUnique({ where: { id: content.personaId } })
+      : null;
+
+    // Determine purpose based on content type
+    let purpose: any = 'feed_post';
+    if (content.contentType === 'carousel') purpose = 'carousel_cover';
+    if (content.contentType === 'article') purpose = 'article_cover';
+
+    // Generate new images using the new pipeline
+    const images = await imageGen.generateLinkedInImage(
+      prompt || content.title || 'LinkedIn professional image',
+      purpose,
+      persona,
+      content.body,
+      undefined,
+      undefined,
+      1
+    );
     
     const updatedContent = await prisma.content.update({
       where: { id },
