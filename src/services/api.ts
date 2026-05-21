@@ -98,6 +98,7 @@ export const linkedinApi = {
   disconnect: (type?: 'cookie' | 'oauth') => api.delete('/auth/linkedin', { params: { type } }),
   getStatus: () => api.get('/auth/linkedin/status'),
   getOAuthUrl: () => api.get('/auth/linkedin/login'),
+  saveAppCredentials: (data: any) => api.post('/auth/linkedin/app-credentials', data),
 };
 
 // System API

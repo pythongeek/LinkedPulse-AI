@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../server';
 import { authenticate, generateToken } from '../middleware/auth';
 import { validateBody } from '../middleware/validation';
-import { userRegistrationSchema, userLoginSchema, linkedinCookiesSchema } from '../utils/validation';
+import { userRegistrationSchema, userLoginSchema, linkedinCookiesSchema, linkedinAppCredentialsSchema } from '../utils/validation';
 import { Encryption } from '../utils/encryption';
 import { logger } from '../utils/logger';
 
@@ -245,11 +245,55 @@ router.post('/linkedin', authenticate, validateBody(linkedinCookiesSchema), asyn
 });
 
 /**
+ * Setup Custom LinkedIn App Credentials
+ * POST /api/auth/linkedin/app-credentials
+ */
+router.post('/linkedin/app-credentials', authenticate, validateBody(linkedinAppCredentialsSchema), async (req, res) => {
+  try {
+    const { clientId, clientSecret } = req.body;
+    const userId = req.user!.id;
+
+    const encryptedClientSecret = Encryption.encrypt(clientSecret);
+
+    await prisma.linkedInSession.upsert({
+      where: { userId },
+      update: {
+        clientId,
+        clientSecret: encryptedClientSecret,
+      },
+      create: {
+        userId,
+        clientId,
+        clientSecret: encryptedClientSecret,
+        expiresAt: new Date(), // Custom app doesn't expire intrinsically here
+      },
+    });
+
+    logger.info(`Custom LinkedIn App configured for user: ${userId}`);
+
+    res.json({ message: 'Custom LinkedIn App credentials saved successfully' });
+  } catch (error) {
+    logger.error('LinkedIn App config error:', error);
+    res.status(500).json({
+      error: { message: 'Failed to save App Credentials', code: 'LINKEDIN_ERROR' },
+    });
+  }
+});
+
+/**
  * Initiate LinkedIn OAuth login
  * GET /api/auth/linkedin/login
  */
-router.get('/linkedin/login', authenticate, (req, res) => {
-  const clientId = process.env.LINKEDIN_CLIENT_ID;
+router.get('/linkedin/login', authenticate, async (req, res) => {
+  const userId = req.user!.id;
+  let clientId = process.env.LINKEDIN_CLIENT_ID;
+
+  // Check for custom app credentials
+  const session = await prisma.linkedInSession.findUnique({ where: { userId } });
+  if (session?.clientId) {
+    clientId = session.clientId;
+  }
+
   if (!clientId) {
     return res.status(500).json({ error: { message: 'LinkedIn Client ID not configured', code: 'CONFIG_ERROR' } });
   }
@@ -259,7 +303,7 @@ router.get('/linkedin/login', authenticate, (req, res) => {
   const backendUrl = process.env.VITE_API_URL || process.env.BACKEND_URL || `${protocol}://${host}`;
   const redirectUri = `${backendUrl}/api/auth/linkedin/callback`;
   const scope = 'w_member_social openid profile email';
-  const state = req.user!.id; // Track user
+  const state = userId; // Track user
 
   const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${encodeURIComponent(scope)}`;
   res.json({ url });
@@ -282,8 +326,14 @@ router.get('/linkedin/callback', async (req, res) => {
 
   try {
     const userId = state as string;
-    const clientId = process.env.LINKEDIN_CLIENT_ID;
-    const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
+    let clientId = process.env.LINKEDIN_CLIENT_ID;
+    let clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
+    
+    const session = await prisma.linkedInSession.findUnique({ where: { userId } });
+    if (session?.clientId && session?.clientSecret) {
+      clientId = session.clientId;
+      clientSecret = Encryption.decrypt(session.clientSecret);
+    }
     
     const host = req.get('host');
     const protocol = req.protocol === 'http' && host?.includes('localhost') ? 'http' : 'https';
@@ -452,6 +502,7 @@ router.get('/linkedin/status', authenticate, async (req, res) => {
       connected: !!session && session.isActive,
       hasCookies: !!session && !!session.liAt && !!session.jsessionId,
       hasOAuth: !!session && !!session.accessToken,
+      hasCustomApp: !!session && !!session.clientId,
       expiresAt: session?.expiresAt || null,
       lastUsed: session?.lastUsed || null,
     });

@@ -118,6 +118,12 @@ export const userLoginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+// Custom LinkedIn App credentials schema
+export const linkedinAppCredentialsSchema = z.object({
+  clientId: z.string().min(1, 'Client ID is required'),
+  clientSecret: z.string().min(1, 'Client Secret is required'),
+});
+
 // Type exports
 export type PersonaInput = z.infer<typeof personaSchema>;
 export type ContentGenerationInput = z.infer<typeof contentGenerationSchema>;
@@ -127,3 +133,4 @@ export type CompetitorAnalysisInput = z.infer<typeof competitorAnalysisSchema>;
 export type ProfileAuditInput = z.infer<typeof profileAuditSchema>;
 export type ImageGenerationInput = z.infer<typeof imageGenerationSchema>;
 export type ResearchInput = z.infer<typeof researchSchema>;
+export type LinkedInAppCredentialsInput = z.infer<typeof linkedinAppCredentialsSchema>;

@@ -233,6 +233,8 @@ model LinkedInSession {
   createdAt   DateTime @default(now()) @map("created_at")
   accessToken String?  @map("access_token")
   refreshToken String? @map("refresh_token")
+  clientId     String?  @map("client_id")
+  clientSecret String?  @map("client_secret")
   
   @@map("linkedin_sessions")
 }
