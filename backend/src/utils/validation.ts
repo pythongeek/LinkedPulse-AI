@@ -59,9 +59,11 @@ export const linkedinCookiesSchema = z.object({
 
 // Competitor analysis validation schema
 export const competitorAnalysisSchema = z.object({
-  topic: z.string().min(1, 'Topic is required'),
+  topic: z.string().min(1, 'Topic is required').max(200),
   depth: z.enum(['quick', 'deep']).default('quick'),
-  postLimit: z.number().min(10).max(100).default(50),
+  postLimit: z.number().min(10).max(100).default(30),
+  includeProfiles: z.boolean().default(false),
+  compareWithPrevious: z.boolean().default(false),
 });
 
 // Profile audit validation schema

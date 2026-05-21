@@ -67,6 +67,14 @@ export const competitorApi = {
   analyze: (data: any) => api.post('/competitor/analyze', data),
   getGaps: (topic: string) => api.get(`/competitor/gaps/${topic}`),
   getTopPerformers: (topic: string) => api.get(`/competitor/top-performers/${topic}`),
+  // New methods
+  getHistory: (topic: string) => api.get(`/competitor/history/${topic}`),
+  generateFromGap: (data: { gap: any; topic: string }) =>
+    api.post('/competitor/generate-from-gap', data),
+  exportAnalysis: (topicId: string, format: 'csv' | 'json') =>
+    api.get(`/competitor/export/${topicId}?format=${format}`, {
+      responseType: format === 'csv' ? 'blob' : 'json',
+    }),
 };
 
 // Audit API

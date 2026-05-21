@@ -7,6 +7,7 @@ import { TrendAnalyzer } from './trendAnalyzer';
 import { EngagementPredictor } from './engagementPredictor';
 import { logger } from '../utils/logger';
 import { HookFormula, PollDuration, CTAType, CarouselSlide, PollOption, LINKEDIN_LIMITS } from '../types/contentTypes';
+import { TopicResearchOrchestrator } from './topicResearchOrchestrator';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -78,11 +79,13 @@ export class ContentGenerationService {
   private minimax: MiniMaxClient;
   private researchService: ResearchService;
   private trendAnalyzer: TrendAnalyzer;
+  private orchestrator: TopicResearchOrchestrator;
 
   constructor() {
     this.minimax = new MiniMaxClient();
     this.researchService = new ResearchService();
     this.trendAnalyzer = new TrendAnalyzer();
+    this.orchestrator = new TopicResearchOrchestrator();
   }
 
   /**
@@ -99,24 +102,46 @@ export class ContentGenerationService {
   }
 
   /**
-   * Phase 0: Research (Gemini)
+   * Phase 0 (REVISED): Parallel multi-source research
    */
   async generatePhase0(options: ContentGenerationOptions): Promise<any> {
     const { topic, researchDepth } = options;
-    logger.info(`[Phase 0] Research for: ${topic}`);
-    const researchData = await this.researchAgent(topic, researchDepth);
-    
-    const dataSourceCount = researchData.sources?.length || 0;
-    const isAiGrounded = dataSourceCount > 0;
-    const statsCount = researchData.statistics?.length || 0;
-    const casesCount = researchData.caseStudies?.length || 0;
-    const researchQuality = Math.min(100, Math.round((dataSourceCount * 10) + (statsCount * 10) + (casesCount * 10) + 30));
+    logger.info(`[Phase 0 v2] Parallel research for: ${topic}`);
 
-    return { 
-      researchData,
-      researchQuality,
-      dataSourceCount,
-      isAiGrounded
+    if (researchDepth === 'none') {
+      return {
+        researchData: { statistics: [], sources: [], keyInsights: [], subtopics: [] },
+        researchQuality: 0,
+        dataSourceCount: 0,
+        isAiGrounded: false,
+      };
+    }
+
+    const research = await this.orchestrator.research(
+      topic,
+      researchDepth as 'quick' | 'deep'
+    );
+
+    return {
+      researchData: {
+        statistics: research.keyStatistics.map(s => ({
+          fact: s.fact,
+          value: s.value,
+          source: s.source,
+        })),
+        expertOpinions: research.expertInsights.map(i => ({
+          expert: i.source,
+          opinion: i.insight,
+        })),
+        caseStudies: [],
+        keyInsights: research.linkedinContext.contentGaps,
+        subtopics: research.relatedQueries.rising.slice(0, 5).map(q => q.query),
+        sources: research.verifiedSources,
+      },
+      researchQuality: research.researchQuality,
+      dataSourceCount: research.dataSourceCount,
+      isAiGrounded: research.isFullyGrounded,
+      _orchestratorResult: research,
     };
   }
 
@@ -125,12 +150,27 @@ export class ContentGenerationService {
    */
   async generatePhase1(options: ContentGenerationOptions, intermediateResult: any): Promise<any> {
     const { topic } = options;
-    logger.info(`[Phase 1] Trend & Competitor Analysis for: ${topic}`);
+    logger.info(`[Phase 1 v2] Trend & Competitor Analysis for: ${topic}`);
     
-    const [trendData, competitiveAnalysis] = await Promise.all([
-      this.trendAgent(topic),
-      this.competitorAnalysisAgent(topic),
-    ]);
+    const orchestratorResult = intermediateResult._orchestratorResult;
+
+    const trendData = orchestratorResult
+      ? {
+          trendingAngles: orchestratorResult.redditSignal.hotAngles.map((angle: string) => ({
+            angle,
+            momentum: orchestratorResult.trendScore,
+            source: orchestratorResult.redditSignal.isDataReal ? 'reddit_real' : 'ai_estimated',
+          })),
+          recommendedHashtags: orchestratorResult.linkedinContext.topHashtags,
+          relatedTopics: orchestratorResult.relatedQueries.rising.map((q: any) => q.query),
+          contentOpportunities: orchestratorResult.linkedinContext.contentGaps,
+          viralityScore: orchestratorResult.trendScore,
+          velocity7d: orchestratorResult.velocity7d,
+          isPeaking: orchestratorResult.isPeaking,
+        }
+      : await this.trendAgent(topic);
+
+    const competitiveAnalysis = await this.competitorAnalysisAgent(topic);
 
     return {
       ...intermediateResult,
@@ -225,16 +265,40 @@ export class ContentGenerationService {
     let imagePrompts: string[] = [];
     let images: string[] = [];
     if (includeImages) {
-      imagePrompts = await this.visualAgent(topic, verified.content, persona);
-      
       try {
         const { ImageGenerationService } = await import('./imageGeneration.js');
+        const { LinkedInImagePromptEngine } = await import('./linkedinImagePromptEngine.js');
         const imageGen = new ImageGenerationService();
-        if (imagePrompts.length > 0) {
-          images = await imageGen.generateImages(imagePrompts[0], 'professional', 1, '16:9');
-        }
+        const promptEngine = new LinkedInImagePromptEngine();
+
+        // Determine correct LinkedIn image purpose based on content type
+        const imagePurpose = options.contentType === 'carousel' ? 'carousel_cover'
+          : options.contentType === 'article' ? 'article_cover'
+          : 'feed_post';
+
+        // Build structured prompt with persona DNA + hook formula
+        const structuredPrompt = promptEngine.buildPrompt(
+          topic,
+          imagePurpose,
+          persona,
+          verified.content?.substring(0, 500),
+          options.hookFormula,
+          `campaign-${topic.slice(0, 20).replace(/[^a-z0-9]/gi, '-')}`
+        );
+
+        imagePrompts = [structuredPrompt.primaryPrompt];
+        logger.info(`[Phase 5] Generating ${imagePurpose} image via provider chain`);
+        images = await imageGen.generateLinkedInImage(
+          topic,
+          imagePurpose,
+          persona,
+          verified.content?.substring(0, 500),
+          options.hookFormula,
+          `campaign-${topic.slice(0, 20).replace(/[^a-z0-9]/gi, '-')}`,
+          1
+        );
       } catch (err) {
-        logger.error('Failed to generate actual images', err);
+        logger.error('[Phase 5] Image generation failed:', err);
       }
     }
 

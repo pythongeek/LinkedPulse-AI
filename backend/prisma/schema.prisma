@@ -19,11 +19,12 @@ model User {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   
   // Relations
-  personas      Persona[]
-  contents      Content[]
-  audits        ProfileAudit[]
-  topicAlerts   TopicAlert[]
-  usageStats    UsageStats?
+  personas            Persona[]
+  contents            Content[]
+  audits              ProfileAudit[]
+  topicAlerts         TopicAlert[]
+  usageStats          UsageStats?
+  competitorProfiles  CompetitorProfile[]
   
   @@map("users")
 }
@@ -55,18 +56,22 @@ model Topic {
   trendData         Json?    @map("trend_data")
   competitionData   Json?    @map("competition_data")
   linkedinData      Json?    @map("linkedin_data")
+  normalizedKeyword String?  @map("normalized_keyword")
+  b2bRelevanceScore Float?   @map("b2b_relevance_score")
+  velocity7d        Float?
+  peakPredictedAt   DateTime? @map("peak_predicted_at")
+  contentAngleMap   Json?    @map("content_angle_map")
+  isEstimated       Boolean  @default(false) @map("is_estimated")
+  dataLastRefreshed DateTime? @map("data_last_refreshed")
   lastAnalyzed      DateTime? @map("last_analyzed")
   createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
   
-  // New research tracking fields
-  serpApiData        Json?    @map("serp_api_data")       // Real trends data
-  communitySignal    Json?    @map("community_signal")    // Reddit/community proxy signal
-  dataLastRefreshed  DateTime? @map("data_last_refreshed")
-  isEstimated        Boolean  @default(true) @map("is_estimated")
-
   // Relations
   contents    Content[]
   competitors CompetitorPost[]
+  researchRuns TopicResearchRun[]
+  signals      TopicSignal[]
   
   @@map("topics")
 }
@@ -123,22 +128,74 @@ model Content {
 }
 
 model CompetitorPost {
-  id          String   @id @default(uuid())
-  topicId     String   @map("topic_id")
-  author      String
-  authorProfile String? @map("author_profile")
-  content     String   @db.Text
-  likes       Int      @default(0)
-  comments    Int      @default(0)
-  shares      Int      @default(0)
-  postUrl     String?  @map("post_url")
-  postedAt    DateTime? @map("posted_at")
-  analyzedAt  DateTime @default(now()) @map("analyzed_at")
-  
+  id              String    @id @default(uuid())
+  topicId         String    @map("topic_id")
+  author          String
+  authorProfile   String?   @map("author_profile")
+  authorFollowers Int?      @map("author_followers")
+  authorJobTitle  String?   @map("author_job_title")
+  content         String    @db.Text
+  hookText        String?   @map("hook_text") @db.Text
+  contentFormat   String    @default("text") @map("content_format")
+  likes           Int       @default(0)
+  comments        Int       @default(0)
+  shares          Int       @default(0)
+  impressions     Int?
+  engagementRate  Float?    @map("engagement_rate")
+  viralScore      Float?    @map("viral_score")
+  wordCount       Int?      @map("word_count")
+  emojiCount      Int?      @map("emoji_count")
+  hashtagsUsed    String[]  @map("hashtags_used")
+  hasMedia        Boolean   @default(false) @map("has_media")
+  hasLink         Boolean   @default(false) @map("has_link")
+  ctaPresent      Boolean   @default(false) @map("cta_present")
+  dayOfWeek       Int?      @map("day_of_week")
+  hourPosted      Int?      @map("hour_posted")
+  postUrl         String?   @map("post_url")
+  postedAt        DateTime? @map("posted_at")
+  analyzedAt      DateTime  @default(now()) @map("analyzed_at")
+  dataSource      String    @default("ai") @map("data_source")
+
   // Relations
   topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  
+
+  @@index([topicId, postedAt])
+  @@index([topicId, engagementRate])
   @@map("competitor_posts")
+}
+
+model CompetitorProfile {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  linkedinUrl     String    @map("linkedin_url")
+  name            String
+  jobTitle        String?   @map("job_title")
+  followers       Int?
+  postFrequency   Float?    @map("post_frequency")
+  avgEngagement   Float?    @map("avg_engagement")
+  topFormats      Json?     @map("top_formats")
+  topHashtags     Json?     @map("top_hashtags")
+  lastScanned     DateTime? @map("last_scanned")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("competitor_profiles")
+}
+
+model AnalysisSnapshot {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  topicKeyword    String    @map("topic_keyword")
+  snapshotData    Json      @map("snapshot_data")
+  postCount       Int       @map("post_count")
+  avgEngagement   Float?    @map("avg_engagement")
+  topGaps         String[]  @map("top_gaps")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, topicKeyword])
+  @@map("analysis_snapshots")
 }
 
 model ProfileAudit {
@@ -201,11 +258,48 @@ model ResearchCache {
   queryType   String   @map("query_type")
   results     Json
   source      String
+  sourceTier  Int      @default(2) @map("source_tier")
+  hitCount    Int      @default(0) @map("hit_count")
+  lastHitAt   DateTime? @map("last_hit_at")
   expiresAt   DateTime @map("expires_at")
   createdAt   DateTime @default(now()) @map("created_at")
   
   @@index([query, queryType])
   @@map("research_cache")
+}
+
+model TopicResearchRun {
+  id             String   @id @default(uuid())
+  topicId        String   @map("topic_id")
+  runAt          DateTime @default(now()) @map("run_at")
+  signals        Json
+  computed       Json
+  dataFreshness  Json     @map("data_freshness")
+  qualityScore   Int      @map("quality_score")
+  sourceCount    Int      @map("source_count")
+  isB2bContext   Boolean  @default(true) @map("is_b2b_context")
+  createdAt      DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  
+  @@map("topic_research_runs")
+}
+
+model TopicSignal {
+  id             String   @id @default(uuid())
+  topicId        String   @map("topic_id")
+  signalType     String   @map("signal_type")
+  source         String
+  rawValue       Json     @map("raw_value")
+  normalizedScore Float?  @map("normalized_score")
+  capturedAt     DateTime @default(now()) @map("captured_at")
+  expiresAt      DateTime @map("expires_at")
+  
+  // Relations
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  
+  @@map("topic_signals")
 }
 
 model ScrapingJob {

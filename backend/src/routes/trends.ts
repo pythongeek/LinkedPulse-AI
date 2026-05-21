@@ -4,6 +4,9 @@ import { authenticate } from '../middleware/auth';
 import { validateBody } from '../middleware/validation';
 import { trendAnalysisSchema } from '../utils/validation';
 import { TrendAnalyzer } from '../services/trendAnalyzer';
+import { TopicResearchOrchestrator } from '../services/topicResearchOrchestrator';
+import { LinkedInContentGapAnalyzer } from '../services/linkedinContentGapAnalyzer';
+import { OpportunityScorer } from '../services/opportunityScorer';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -33,17 +36,44 @@ router.post('/analyze', authenticate, validateBody(trendAnalysisSchema), async (
       });
     }
 
-    // Analyze trends
-    const analyzer = new TrendAnalyzer();
-    const results = await analyzer.analyzeTrends(keywords, timeframe, geo);
+    // Analyze trends (supporting new orchestrator)
+    const orchestrator = new TopicResearchOrchestrator();
+    const gapAnalyzer = new LinkedInContentGapAnalyzer();
+    const scorer = new OpportunityScorer();
+
+    // The original API took an array of keywords. We'll research the first one deeply for the new UI.
+    const primaryKeyword = keywords[0];
+    
+    logger.info(`Running new Orchestrated Research for: ${primaryKeyword}`);
+    const researchResult = await orchestrator.research(primaryKeyword, 'deep');
+    
+    // Attempt to get user persona context if available
+    let personaContext: string | undefined;
+    const defaultPersona = await prisma.persona.findFirst({
+      where: { userId: req.user!.id, isDefault: true }
+    });
+    if (defaultPersona) {
+      personaContext = `${defaultPersona.jobRole}. Voice: ${defaultPersona.tone}`;
+    }
+
+    const gapResult = await gapAnalyzer.analyzeGaps(primaryKeyword, personaContext);
+    const opportunityScore = scorer.score(researchResult, gapResult);
+
+    const enrichedResult = {
+      research: researchResult,
+      gaps: gapResult,
+      opportunity: opportunityScore,
+      // Include old analyzer results for backwards compatibility
+      legacyComparison: await new TrendAnalyzer().analyzeTrends(keywords, timeframe, geo),
+    };
 
     // Cache results for 6 hours
     await prisma.researchCache.create({
       data: {
         query: cacheKey,
-        queryType: 'trends',
-        results: results as any,
-        source: 'google_trends',
+        queryType: 'trends_v2',
+        results: enrichedResult as any,
+        source: 'orchestrator_v2',
         expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000),
       },
     });
@@ -56,7 +86,7 @@ router.post('/analyze', authenticate, validateBody(trendAnalysisSchema), async (
 
     res.json({
       cached: false,
-      data: results,
+      data: enrichedResult,
     });
   } catch (error) {
     logger.error('Trend analysis error:', error);
