@@ -16,7 +16,7 @@ model User {
   linkedinCookies String?  @map("linkedin_cookies")
   linkedinProfile Json?    @map("linkedin_profile")
   createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
   
   // Relations
   personas            Persona[]
@@ -41,7 +41,7 @@ model Persona {
   systemPrompt    String   @map("system_prompt") @db.Text
   isDefault       Boolean  @default(false) @map("is_default")
   createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
   
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -65,7 +65,7 @@ model Topic {
   dataLastRefreshed DateTime? @map("data_last_refreshed")
   lastAnalyzed      DateTime? @map("last_analyzed")
   createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
   
   // Relations
   contents    Content[]
@@ -98,7 +98,7 @@ model Content {
   scheduledFor      DateTime? @map("scheduled_for")
   publishedAt       DateTime? @map("published_at")
   createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
   
   // Structured per-content-type fields
   slides            Json?    @map("slides")            // CarouselSlide[]
@@ -177,7 +177,7 @@ model CompetitorProfile {
   topHashtags     Json?     @map("top_hashtags")
   lastScanned     DateTime? @map("last_scanned")
   createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -244,7 +244,7 @@ model UsageStats {
   apiCalls            Int      @default(0) @map("api_calls")
   lastReset           DateTime @default(now()) @map("last_reset")
   createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
   
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -355,7 +355,7 @@ model QueuedJob {
   priority          Int       @default(0)
   runAt             DateTime  @default(now())
   createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  updatedAt         DateTime  @default(now()) @updatedAt
   
   @@map("queued_jobs")
 }
