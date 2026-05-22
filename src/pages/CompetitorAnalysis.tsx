@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { competitorApi } from '../services/api';
+import { competitorApi, jobApi } from '../services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,14 +34,23 @@ const GAP_TYPE_STYLES: Record<string, { label: string; color: string; bg: string
 export default function CompetitorAnalysis() {
   const [topic, setTopic] = useState('');
   const [depth, setDepth] = useState<'quick' | 'deep'>('quick');
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
   const navigate = useNavigate();
 
   const analyzeMutation = useMutation({
     mutationFn: (t: string) => competitorApi.analyze({ topic: t, depth }),
     onSuccess: (res) => {
       if (res.data.cached) {
+        setAnalysisResult(res.data.analysis);
         toast.info('Loaded from recent cache');
+      } else if (res.data.jobId) {
+        setJobId(res.data.jobId);
+        setIsPolling(true);
+        toast.info('Deep analysis started. This may take a minute...');
       } else {
+        setAnalysisResult(res.data.analysis);
         toast.success('Real competitor intelligence ready!');
       }
     },
@@ -50,12 +59,48 @@ export default function CompetitorAnalysis() {
     },
   });
 
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (jobId && isPolling) {
+      interval = setInterval(async () => {
+        try {
+          const res = await jobApi.getStatus(jobId);
+          const job = res.data.job;
+          
+          if (job.status === 'COMPLETED') {
+            setIsPolling(false);
+            setJobId(null);
+            if (job.result?.analysis) {
+              setAnalysisResult(job.result.analysis);
+              toast.success('Real competitor intelligence ready!');
+            }
+          } else if (job.status === 'FAILED') {
+            setIsPolling(false);
+            setJobId(null);
+            toast.error(job.error || 'Analysis failed');
+          }
+        } catch (error) {
+          console.error('Error polling job status:', error);
+          setIsPolling(false);
+          setJobId(null);
+          toast.error('Failed to check analysis status');
+        }
+      }, 3000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [jobId, isPolling]);
+
   const handleAnalyze = () => {
     if (!topic) { toast.error('Please enter a topic'); return; }
+    setAnalysisResult(null); // Clear previous results
     analyzeMutation.mutate(topic);
   };
 
-  const analysis = analyzeMutation.data?.data.analysis as any;
+  const analysis = analysisResult || analyzeMutation.data?.data?.analysis;
   const structuredGaps = analysis?.structuredGaps || [];
   const contentBriefs = analysis?.contentBriefs || [];
   const benchmark = analysis?.benchmark;
@@ -113,21 +158,21 @@ export default function CompetitorAnalysis() {
             </Button>
             <Button
               onClick={handleAnalyze}
-              disabled={analyzeMutation.isPending}
+              disabled={analyzeMutation.isPending || isPolling}
               className="w-36"
             >
-              {analyzeMutation.isPending ? (
+              {analyzeMutation.isPending || isPolling ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
                 <Search className="mr-2 h-4 w-4" />
               )}
-              {analyzeMutation.isPending ? 'Researching...' : 'Analyze'}
+              {analyzeMutation.isPending || isPolling ? 'Researching...' : 'Analyze'}
             </Button>
           </div>
-          {analyzeMutation.isPending && (
+          {(analyzeMutation.isPending || isPolling) && (
             <p className="text-sm text-muted-foreground mt-3 flex items-center gap-2">
               <Radio className="w-4 h-4 text-blue-500 animate-pulse" />
-              Searching Google, Reddit, and LinkedIn for real signals... this takes ~30 seconds
+              Searching Google, Reddit, and LinkedIn for real signals... this may take a minute
             </p>
           )}
         </CardContent>
