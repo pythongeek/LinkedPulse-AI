@@ -329,61 +329,79 @@ export default function ContentStudio() {
   };
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden font-sans">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background pointer-events-none" />
-      <div className="absolute top-0 right-0 w-[800px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[500px] bg-violet-600/10 blur-[100px] rounded-full pointer-events-none" />
+    <div className="min-h-screen bg-[#050505] relative overflow-hidden font-sans text-slate-200">
+      {/* Dynamic Animated Background Elements */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-600/10 rounded-full blur-[120px] mix-blend-screen animate-[pulse_8s_ease-in-out_infinite]" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] bg-violet-600/10 rounded-full blur-[150px] mix-blend-screen animate-[pulse_10s_ease-in-out_infinite_reverse]" />
+      <div className="absolute top-[40%] left-[20%] w-[30vw] h-[30vw] bg-blue-600/5 rounded-full blur-[100px] mix-blend-screen animate-[pulse_12s_ease-in-out_infinite]" />
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none mix-blend-overlay"></div>
       
-      <div className="relative space-y-8 text-foreground max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 z-10">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/10 pb-6">
-        <div>
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-br from-white via-indigo-200 to-violet-400 bg-clip-text text-transparent drop-shadow-sm">
-            LinkedIn Content Studio
+      <div className="relative space-y-10 max-w-[1400px] mx-auto px-6 sm:px-8 lg:px-12 py-12 z-10">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 border-b border-white/5 pb-8">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-bold uppercase tracking-widest shadow-[0_0_20px_rgba(99,102,241,0.15)]">
+            <Sparkles className="w-3 h-3" />
+            Advanced Agentic Pipeline
+          </div>
+          <h1 className="text-5xl md:text-6xl font-black tracking-tight bg-gradient-to-br from-white via-slate-200 to-slate-500 bg-clip-text text-transparent drop-shadow-sm">
+            Content Studio
           </h1>
-          <p className="text-muted-foreground/80 text-sm mt-2 max-w-2xl leading-relaxed">
+          <p className="text-slate-400 text-base max-w-2xl leading-relaxed font-medium">
             Generate algorithm-optimized, fact-checked, visual content and slides using our specialized LinkedIn agent pipeline.
           </p>
         </div>
         
         {/* System API Capability status indicators */}
-        <div className="flex flex-wrap items-center gap-2 bg-white/5 backdrop-blur-md p-2 rounded-2xl border border-white/10 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/40 text-[10px] font-bold text-foreground border border-white/5 shadow-inner">
-            <span className="text-muted-foreground/80">Trends API:</span>
+        <div className="flex flex-wrap items-center gap-3 bg-[#0f0f13] backdrop-blur-2xl p-2.5 rounded-2xl border border-white/5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.8)]">
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-black/60 text-xs font-bold text-slate-300 border border-white/5 shadow-inner">
+            <span className="text-slate-500">Trends API:</span>
             {systemHealth?.capabilities?.hasRealTrends ? (
-              <span className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)] flex items-center gap-1">● Live</span>
+              <span className="text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.5)] flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                Live
+              </span>
             ) : (
-              <span className="text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)] flex items-center gap-1">▲ AI-only</span>
+              <span className="text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)] flex items-center gap-1.5">▲ AI-only</span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/40 text-[10px] font-bold text-foreground border border-white/5 shadow-inner">
-            <span className="text-muted-foreground/80">Google Grounding:</span>
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-black/60 text-xs font-bold text-slate-300 border border-white/5 shadow-inner">
+            <span className="text-slate-500">Google Grounding:</span>
             {systemHealth?.capabilities?.hasRealResearch ? (
-              <span className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)] flex items-center gap-1">● Live</span>
+              <span className="text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.5)] flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                Live
+              </span>
             ) : (
-              <span className="text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)] flex items-center gap-1">▲ Disabled</span>
+              <span className="text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)] flex items-center gap-1.5">▲ Disabled</span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/40 text-[10px] font-bold text-foreground border border-white/5 shadow-inner">
-            <span className="text-muted-foreground/80">LinkedIn OAuth:</span>
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-black/60 text-xs font-bold text-slate-300 border border-white/5 shadow-inner">
+            <span className="text-slate-500">LinkedIn OAuth:</span>
             {systemHealth?.capabilities?.hasLinkedInOAuth ? (
-              <span className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)] flex items-center gap-1">● Active</span>
+              <span className="text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.5)] flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                Active
+              </span>
             ) : (
-              <span className="text-violet-400 drop-shadow-[0_0_8px_rgba(167,139,250,0.5)] flex items-center gap-1">⬥ Cookie fallback</span>
+              <span className="text-violet-400 drop-shadow-[0_0_12px_rgba(167,139,250,0.5)] flex items-center gap-1.5">⬥ Cookie fallback</span>
             )}
           </div>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-12 items-start">
+      <div className="grid gap-8 lg:grid-cols-12 items-start">
         {/* Input Settings Panel (Grid col 5) */}
-        <div className="lg:col-span-5 space-y-6">
-          <Card className="border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 pointer-events-none" />
-            <CardHeader className="pb-4 relative z-10">
-              <CardTitle className="text-xl font-bold bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">Content Configurations</CardTitle>
-              <CardDescription className="text-xs text-muted-foreground/80">Tailor the ghostwriting parameters for this campaign.</CardDescription>
+        <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+          <Card className="border-0 bg-[#0a0a0c]/80 backdrop-blur-3xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden relative ring-1 ring-white/5">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-purple-500/5 pointer-events-none" />
+            <CardHeader className="pb-5 relative z-10 border-b border-white/5 bg-white/[0.02]">
+              <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-indigo-400" />
+                Configurations
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-400">Tailor the ghostwriting parameters.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-6 pt-6">
               {/* Topic Input */}
               <div className="space-y-1.5">
                 <Label htmlFor="topic" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Topic</Label>
@@ -663,32 +681,36 @@ export default function ContentStudio() {
           </Card>
         </div>
 
-        {/* Output Previews & Tabs (Grid col 7) */}
-        <div className="lg:col-span-7">
-          <Card className="border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-bl from-violet-500/5 to-indigo-500/5 pointer-events-none" />
-            <CardHeader className="pb-4 relative z-10">
-              <CardTitle className="text-xl font-bold bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">Campaign Content Deck</CardTitle>
-              <CardDescription className="text-xs text-muted-foreground/80">Evaluate and optimize your generated posts.</CardDescription>
+        {/* Output Previews & Tabs */}
+        <div className="lg:col-span-8 xl:col-span-9">
+          <Card className="border-0 bg-[#0a0a0c]/80 backdrop-blur-3xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden relative ring-1 ring-white/5 min-h-[800px] flex flex-col">
+            <div className="absolute inset-0 bg-gradient-to-tl from-indigo-500/5 via-transparent to-violet-500/5 pointer-events-none" />
+            <CardHeader className="pb-5 relative z-10 border-b border-white/5 bg-white/[0.02] flex-none">
+              <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-violet-400" />
+                Campaign Content Deck
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-400">Evaluate and optimize your generated posts.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex flex-col p-6">
               {generatedContent && (
-                <div className="grid grid-cols-3 gap-4 p-4 bg-black/20 rounded-2xl border border-white/5 mb-6 text-center shadow-inner">
-                  <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:bg-white/10 transition-colors">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest mb-2">Grounded Status</span>
-                    <div className={cn("px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,0,0,0.5)] border", generatedContent.isAiGrounded ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.15)]" : "bg-amber-500/10 text-amber-400 border-amber-500/20")}>
-                      {generatedContent.isAiGrounded ? <><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> GOOGLE SEARCH</> : <><div className="w-1.5 h-1.5 rounded-full bg-amber-400" /> AI ONLY</>}
+                <div className="grid grid-cols-3 gap-4 bg-[#050505]/50 rounded-2xl border border-white/5 mb-6 text-center shadow-inner p-4 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.05] mix-blend-overlay pointer-events-none" />
+                  <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-white/[0.02] border border-white/5 shadow-[0_4px_24px_rgba(0,0,0,0.4)] hover:bg-white/[0.04] transition-colors relative z-10">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-3">Grounded Status</span>
+                    <div className={cn("px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(0,0,0,0.5)] border", generatedContent.isAiGrounded ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_20px_rgba(52,211,153,0.15)]" : "bg-amber-500/10 text-amber-400 border-amber-500/20")}>
+                      {generatedContent.isAiGrounded ? <><div className="w-2 h-2 rounded-full bg-emerald-400 animate-[pulse_2s_ease-in-out_infinite]" /> GOOGLE SEARCH</> : <><div className="w-2 h-2 rounded-full bg-amber-400" /> AI ONLY</>}
                     </div>
                   </div>
-                  <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:bg-white/10 transition-colors relative overflow-hidden group">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-white/[0.02] border border-white/5 shadow-[0_4px_24px_rgba(0,0,0,0.4)] hover:bg-white/[0.04] transition-colors relative overflow-hidden group z-10">
                     <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest mb-1 relative z-10">Research Quality</span>
-                    <span className="text-2xl font-black font-mono text-indigo-400 drop-shadow-[0_0_8px_rgba(129,140,248,0.5)] relative z-10">{generatedContent.researchQuality || 50}<span className="text-xs text-indigo-400/50">%</span></span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1 relative z-10">Research Quality</span>
+                    <span className="text-3xl font-black font-mono text-indigo-400 drop-shadow-[0_0_12px_rgba(129,140,248,0.5)] relative z-10">{generatedContent.researchQuality || 50}<span className="text-sm text-indigo-400/50 ml-1">%</span></span>
                   </div>
-                  <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:bg-white/10 transition-colors relative overflow-hidden group">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-white/[0.02] border border-white/5 shadow-[0_4px_24px_rgba(0,0,0,0.4)] hover:bg-white/[0.04] transition-colors relative overflow-hidden group z-10">
                     <div className="absolute inset-0 bg-gradient-to-t from-violet-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest mb-1 relative z-10">Verified Sources</span>
-                    <span className="text-2xl font-black font-mono text-violet-400 drop-shadow-[0_0_8px_rgba(167,139,250,0.5)] relative z-10">{generatedContent.dataSourceCount || 0}<span className="text-xs text-violet-400/50 block -mt-1 font-sans">sites</span></span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1 relative z-10">Verified Sources</span>
+                    <span className="text-3xl font-black font-mono text-violet-400 drop-shadow-[0_0_12px_rgba(167,139,250,0.5)] relative z-10">{generatedContent.dataSourceCount || 0}<span className="text-sm text-violet-400/50 ml-1 font-sans">sites</span></span>
                   </div>
                 </div>
               )}
