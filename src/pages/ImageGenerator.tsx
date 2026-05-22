@@ -116,8 +116,8 @@ export default function ImageGenerator() {
       generateMutation.mutate({
         prompt: topic,
         purpose: selectedPurpose,
-        personaId: selectedPersonaId || undefined,
-        hookFormula: selectedHook || undefined,
+        personaId: selectedPersonaId && selectedPersonaId !== 'none' ? selectedPersonaId : undefined,
+        hookFormula: selectedHook && selectedHook !== 'none' ? selectedHook : undefined,
         campaignId: campaignId || `campaign-${topic.slice(0, 20).replace(/[^a-z0-9]/gi, '-')}`,
         count: count[0],
       });
@@ -139,8 +139,8 @@ export default function ImageGenerator() {
       const res = await imageApi.generate({
         prompt: topic,
         purpose: selectedPurpose,
-        personaId: selectedPersonaId || undefined,
-        hookFormula: selectedHook || undefined,
+        personaId: selectedPersonaId && selectedPersonaId !== 'none' ? selectedPersonaId : undefined,
+        hookFormula: selectedHook && selectedHook !== 'none' ? selectedHook : undefined,
         count: 0, // count=0 signals preview-only mode (we'll just get the prompt back)
       });
       // The route returns the prompt used
@@ -260,7 +260,7 @@ export default function ImageGenerator() {
                     <SelectValue placeholder="Select mood (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {HOOK_FORMULAS.map((h) => (
                       <SelectItem key={h.value} value={h.value}>
                         <div>
@@ -281,7 +281,7 @@ export default function ImageGenerator() {
                     <SelectValue placeholder="No persona (default style)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Default style</SelectItem>
+                    <SelectItem value="none">Default style</SelectItem>
                     {personas?.map((p: any) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name} {p.isDefault ? '★' : ''}

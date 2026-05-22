@@ -23,12 +23,12 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
 
 // Gap type color coding from the plan
 const GAP_TYPE_STYLES: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
-  angle:    { label: 'Angle Gap',    color: 'text-blue-700',   bg: 'bg-blue-50',   border: 'border-blue-200',   icon: Target },
-  format:   { label: 'Format Gap',  color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200', icon: BarChart3 },
-  audience: { label: 'Audience Gap', color: 'text-green-700',  bg: 'bg-green-50',  border: 'border-green-200',  icon: Users },
-  recency:  { label: 'Recency Gap', color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200',  icon: TrendingUp },
-  data:     { label: 'Data Gap',    color: 'text-red-700',    bg: 'bg-red-50',    border: 'border-red-200',    icon: BookOpen },
-  depth:    { label: 'Depth Gap',   color: 'text-teal-700',   bg: 'bg-teal-50',   border: 'border-teal-200',   icon: Zap },
+  angle:    { label: 'Angle Gap',    color: 'text-blue-700 dark:text-blue-400',   bg: 'bg-blue-50 dark:bg-blue-950/30',   border: 'border-blue-200 dark:border-blue-800',   icon: Target },
+  format:   { label: 'Format Gap',  color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/30', border: 'border-purple-200 dark:border-purple-800', icon: BarChart3 },
+  audience: { label: 'Audience Gap', color: 'text-green-700 dark:text-green-400',  bg: 'bg-green-50 dark:bg-green-950/30',  border: 'border-green-200 dark:border-green-800',  icon: Users },
+  recency:  { label: 'Recency Gap', color: 'text-amber-700 dark:text-amber-400',  bg: 'bg-amber-50 dark:bg-amber-950/30',  border: 'border-amber-200 dark:border-amber-800',  icon: TrendingUp },
+  data:     { label: 'Data Gap',    color: 'text-red-700 dark:text-red-400',    bg: 'bg-red-50 dark:bg-red-950/30',    border: 'border-red-200 dark:border-red-800',    icon: BookOpen },
+  depth:    { label: 'Depth Gap',   color: 'text-teal-700 dark:text-teal-400',   bg: 'bg-teal-50 dark:bg-teal-950/30',   border: 'border-teal-200 dark:border-teal-800',   icon: Zap },
 };
 
 export default function CompetitorAnalysis() {
@@ -120,7 +120,7 @@ export default function CompetitorAnalysis() {
         {analysis && (
           <div className="flex items-center gap-2">
             {isGrounded && (
-              <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1">
+              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> Google-Grounded
               </Badge>
             )}
@@ -216,8 +216,8 @@ export default function CompetitorAnalysis() {
               <CardContent className="p-6">
                 <p className="text-sm font-medium text-muted-foreground">Content Gaps Found</p>
                 <div className="flex items-center mt-2">
-                  <p className="text-3xl font-bold text-green-600">{structuredGaps.length}</p>
-                  <Badge className="ml-auto bg-green-100 text-green-800">Actionable</Badge>
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">{structuredGaps.length}</p>
+                  <Badge className="ml-auto bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Actionable</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -226,7 +226,7 @@ export default function CompetitorAnalysis() {
           {/* === PRIORITY GAP BOARD === */}
           {structuredGaps.length > 0 && (
             <Card className="border-2 border-blue-200 shadow-md">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-lg">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-t-lg">
                 <CardTitle className="flex items-center gap-2 text-xl">
                   <Lightbulb className="h-5 w-5 text-blue-600" />
                   Priority Gap Board
@@ -264,7 +264,7 @@ export default function CompetitorAnalysis() {
                         {/* Content */}
                         <h4 className="font-bold text-base mb-1">{gap.title}</h4>
                         <p className="text-sm text-muted-foreground mb-2 flex-1">{gap.problem}</p>
-                        <p className="text-sm font-medium text-green-700 bg-green-50 px-3 py-2 rounded-lg mb-3 border border-green-200">
+                        <p className="text-sm font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-3 py-2 rounded-lg mb-3 border border-green-200 dark:border-green-800">
                           💡 {gap.opportunity}
                         </p>
 
@@ -273,7 +273,7 @@ export default function CompetitorAnalysis() {
                           <Badge variant="outline" className="text-xs capitalize">{gap.suggestedFormat}</Badge>
                           <Badge
                             variant="outline"
-                            className={`text-xs ${gap.competitionLevel === 'low' ? 'text-green-700 border-green-300' : gap.competitionLevel === 'medium' ? 'text-amber-700 border-amber-300' : 'text-red-700 border-red-300'}`}
+                            className={`text-xs ${gap.competitionLevel === 'low' ? 'text-green-700 border-green-300 dark:text-green-400 dark:border-green-700' : gap.competitionLevel === 'medium' ? 'text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-700' : 'text-red-700 border-red-300 dark:text-red-400 dark:border-red-700'}`}
                           >
                             {gap.competitionLevel === 'low' ? '🟢' : gap.competitionLevel === 'medium' ? '🟡' : '🔴'} {gap.competitionLevel} competition
                           </Badge>
@@ -305,11 +305,11 @@ export default function CompetitorAnalysis() {
           {/* === CONTENT BRIEFS === */}
           {contentBriefs.length > 0 && (
             <Card className="border border-purple-200 shadow-sm">
-              <CardHeader className="bg-purple-50 rounded-t-lg">
+              <CardHeader className="bg-purple-50 dark:bg-purple-950/20 rounded-t-lg">
                 <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-purple-600" />
+                  <BookOpen className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   Execution-Ready Content Briefs
-                  <Badge className="ml-2 bg-purple-100 text-purple-800">Top {contentBriefs.length}</Badge>
+                  <Badge className="ml-2 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">Top {contentBriefs.length}</Badge>
                 </CardTitle>
                 <CardDescription>
                   Full briefs a ghostwriter can execute immediately — based on real gaps.
@@ -318,17 +318,17 @@ export default function CompetitorAnalysis() {
               <CardContent className="p-6">
                 <div className="space-y-4">
                   {contentBriefs.map((brief: any, i: number) => (
-                    <div key={i} className="p-5 border rounded-xl bg-white shadow-sm">
+                    <div key={i} className="p-5 border rounded-xl bg-white dark:bg-slate-900 shadow-sm">
                       <div className="flex items-start justify-between gap-4 mb-3">
                         <div className="flex-1">
                           <h4 className="font-bold text-lg">{brief.headline}</h4>
-                          <p className="text-sm text-blue-700 font-medium mt-1">{brief.angle}</p>
+                          <p className="text-sm text-blue-700 dark:text-blue-400 font-medium mt-1">{brief.angle}</p>
                         </div>
                         <Badge variant="outline" className="capitalize shrink-0">{brief.recommendedFormat}</Badge>
                       </div>
 
                       {/* Opening hook */}
-                      <div className="bg-gray-50 border rounded-lg p-3 mb-4">
+                      <div className="bg-gray-50 dark:bg-slate-800 border rounded-lg p-3 mb-4">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Opening Hook</p>
                         <p className="text-sm font-medium italic">"{brief.openingHook}"</p>
                       </div>
@@ -347,14 +347,14 @@ export default function CompetitorAnalysis() {
 
                       {/* Data angle */}
                       {brief.uniqueDataAngle && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-                          <p className="text-xs font-medium text-amber-800 uppercase tracking-wider mb-1">📊 Unique Data Angle</p>
-                          <p className="text-sm font-medium text-amber-900">{brief.uniqueDataAngle}</p>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-4">
+                          <p className="text-xs font-medium text-amber-800 dark:text-amber-400 uppercase tracking-wider mb-1">📊 Unique Data Angle</p>
+                          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{brief.uniqueDataAngle}</p>
                         </div>
                       )}
 
                       {/* Why it wins */}
-                      <p className="text-sm text-green-700 font-medium bg-green-50 px-3 py-2 rounded-lg border border-green-200 mb-4">
+                      <p className="text-sm text-green-700 dark:text-green-400 font-medium bg-green-50 dark:bg-green-950/30 px-3 py-2 rounded-lg border border-green-200 dark:border-green-800 mb-4">
                         ✅ {brief.whyItWins}
                       </p>
 
@@ -400,7 +400,7 @@ export default function CompetitorAnalysis() {
                         </p>
                         <ul className="space-y-1">
                           {benchmark.risingAngles.map((a: string, i: number) => (
-                            <li key={i} className="text-sm p-2 bg-green-50 rounded border border-green-100">{a}</li>
+                            <li key={i} className="text-sm p-2 bg-green-50 dark:bg-green-950/30 rounded border border-green-100 dark:border-green-800">{a}</li>
                           ))}
                         </ul>
                       </div>
@@ -412,7 +412,7 @@ export default function CompetitorAnalysis() {
                         </p>
                         <ul className="space-y-1">
                           {benchmark.saturatedAngles.map((a: string, i: number) => (
-                            <li key={i} className="text-sm p-2 bg-red-50 rounded border border-red-100 line-through text-muted-foreground">{a}</li>
+                            <li key={i} className="text-sm p-2 bg-red-50 dark:bg-red-950/30 rounded border border-red-100 dark:border-red-800 line-through text-muted-foreground">{a}</li>
                           ))}
                         </ul>
                       </div>
@@ -450,7 +450,7 @@ export default function CompetitorAnalysis() {
                         <p className="text-sm font-medium mb-2 text-red-700">😤 Top Pain Points</p>
                         <ul className="space-y-1">
                           {communitySignal.painPoints.slice(0, 4).map((p: string, i: number) => (
-                            <li key={i} className="text-sm p-2 bg-red-50 rounded border border-red-100 flex items-start gap-2">
+                            <li key={i} className="text-sm p-2 bg-red-50 dark:bg-red-950/30 rounded border border-red-100 dark:border-red-800 flex items-start gap-2">
                               <span className="text-red-400">•</span> {p}
                             </li>
                           ))}
@@ -462,7 +462,7 @@ export default function CompetitorAnalysis() {
                         <p className="text-sm font-medium mb-2 text-blue-700">❓ Unanswered Questions</p>
                         <ul className="space-y-1">
                           {communitySignal.commonQuestions.slice(0, 4).map((q: string, i: number) => (
-                            <li key={i} className="text-sm p-2 bg-blue-50 rounded border border-blue-100 flex items-start gap-2">
+                            <li key={i} className="text-sm p-2 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-100 dark:border-blue-800 flex items-start gap-2">
                               <span className="text-blue-400">•</span> {q}
                             </li>
                           ))}
@@ -474,14 +474,14 @@ export default function CompetitorAnalysis() {
                         <p className="text-sm font-medium mb-2 text-orange-700">🔥 Hot Discussions</p>
                         <ul className="space-y-1">
                           {communitySignal.hotDiscussions.slice(0, 3).map((d: string, i: number) => (
-                            <li key={i} className="text-sm p-2 bg-orange-50 rounded border border-orange-100">{d}</li>
+                            <li key={i} className="text-sm p-2 bg-orange-50 dark:bg-orange-950/30 rounded border border-orange-100 dark:border-orange-800">{d}</li>
                           ))}
                         </ul>
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-sm font-medium p-3 bg-muted rounded-lg">
                       <span>Overall Sentiment:</span>
-                      <Badge className={communitySignal.sentiment === 'positive' ? 'bg-green-100 text-green-800' : communitySignal.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}>
+                      <Badge className={communitySignal.sentiment === 'positive' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : communitySignal.sentiment === 'negative' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'}>
                         {communitySignal.sentiment}
                       </Badge>
                     </div>
@@ -590,7 +590,7 @@ export default function CompetitorAnalysis() {
                     <h4 className="font-semibold mb-2 text-sm">#️⃣ Top Hashtags</h4>
                     <div className="flex flex-wrap gap-2">
                       {analysis.topHashtags?.map((tag: string, i: number) => (
-                        <Badge key={i} variant="outline" className="text-xs bg-purple-50">{tag}</Badge>
+                        <Badge key={i} variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/30">{tag}</Badge>
                       ))}
                     </div>
                   </div>
