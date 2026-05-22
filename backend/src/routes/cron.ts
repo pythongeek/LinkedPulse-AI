@@ -208,77 +208,98 @@ router.get('/tick', async (req, res) => {
           const analyzer = new CompetitorAnalyzer();
           const { topic, depth, postLimit, userId, cacheKey } = payload;
           
-          const analysis = await analyzer.analyze([], topic, depth);
+          try {
+            if (job.phase === 0) {
+              const p0Result = await analyzer.generatePhase0(topic, depth);
+              await JobService.progressToNextPhase(job.id, 1, p0Result);
+              return res.json({ message: 'Competitor Phase 0 complete', jobId: job.id, phase: 0 });
+            } else if (job.phase === 1) {
+              const p1Result = await analyzer.generatePhase1(topic, depth, job.intermediateResult);
+              await JobService.progressToNextPhase(job.id, 2, p1Result);
+              return res.json({ message: 'Competitor Phase 1 complete', jobId: job.id, phase: 1 });
+            } else if (job.phase === 2) {
+              const p2Result = await analyzer.generatePhase2(topic, depth, job.intermediateResult);
+              await JobService.progressToNextPhase(job.id, 3, p2Result);
+              return res.json({ message: 'Competitor Phase 2 complete', jobId: job.id, phase: 2 });
+            } else if (job.phase === 3) {
+              const analysis = await analyzer.generatePhase3([], topic, depth, job.intermediateResult);
 
-          // 3. Upsert topic record
-          const topicRecord = await prisma.topic.upsert({
-            where: { keyword: topic.toLowerCase() },
-            update: {
-              competitionData: analysis as any,
-              lastAnalyzed: new Date(),
-            },
-            create: {
-              keyword: topic.toLowerCase(),
-              competitionData: analysis as any,
-              lastAnalyzed: new Date(),
-            },
-          });
+              // 3. Upsert topic record
+              const topicRecord = await prisma.topic.upsert({
+                where: { keyword: topic.toLowerCase() },
+                update: {
+                  competitionData: analysis as any,
+                  lastAnalyzed: new Date(),
+                },
+                create: {
+                  keyword: topic.toLowerCase(),
+                  competitionData: analysis as any,
+                  lastAnalyzed: new Date(),
+                },
+              });
 
-          // 4. Save enriched posts to database
-          if (analysis.allPosts.length > 0) {
-            await prisma.competitorPost.createMany({
-              data: analysis.allPosts.map((post: any) => ({
-                topicId: topicRecord.id,
-                author: post.author,
-                authorProfile: post.authorProfile,
-                content: post.content,
-                hookText: post.hookText,
-                contentFormat: post.contentFormat,
-                likes: post.likes,
-                comments: post.comments,
-                shares: post.shares,
-                engagementRate: post.engagementRate,
-                viralScore: post.viralScore,
-                wordCount: post.wordCount,
-                emojiCount: post.emojiCount,
-                hashtagsUsed: post.hashtagsUsed,
-                hasMedia: post.hasMedia,
-                hasLink: post.hasLink,
-                ctaPresent: post.ctaPresent,
-                dayOfWeek: post.dayOfWeek >= 0 ? post.dayOfWeek : null,
-                hourPosted: post.hourPosted >= 0 ? post.hourPosted : null,
-                postUrl: post.postUrl,
-                postedAt: post.postedAt ? new Date(post.postedAt) : null,
-                dataSource: post.dataSource,
-              })),
-              skipDuplicates: true,
-            });
+              // 4. Save enriched posts to database
+              if (analysis.allPosts.length > 0) {
+                await prisma.competitorPost.createMany({
+                  data: analysis.allPosts.map((post: any) => ({
+                    topicId: topicRecord.id,
+                    author: post.author,
+                    authorProfile: post.authorProfile,
+                    content: post.content,
+                    hookText: post.hookText,
+                    contentFormat: post.contentFormat,
+                    likes: post.likes,
+                    comments: post.comments,
+                    shares: post.shares,
+                    engagementRate: post.engagementRate,
+                    viralScore: post.viralScore,
+                    wordCount: post.wordCount,
+                    emojiCount: post.emojiCount,
+                    hashtagsUsed: post.hashtagsUsed,
+                    hasMedia: post.hasMedia,
+                    hasLink: post.hasLink,
+                    ctaPresent: post.ctaPresent,
+                    dayOfWeek: post.dayOfWeek >= 0 ? post.dayOfWeek : null,
+                    hourPosted: post.hourPosted >= 0 ? post.hourPosted : null,
+                    postUrl: post.postUrl,
+                    postedAt: post.postedAt ? new Date(post.postedAt) : null,
+                    dataSource: post.dataSource,
+                  })),
+                  skipDuplicates: true,
+                });
+              }
+
+              // 5. Save analysis snapshot
+              await prisma.analysisSnapshot.create({
+                data: {
+                  userId,
+                  topicKeyword: topic.toLowerCase(),
+                  snapshotData: analysis as any,
+                  postCount: analysis.totalPostsAnalyzed,
+                  avgEngagement: analysis.avgEngagement.likes + analysis.avgEngagement.comments,
+                  topGaps: analysis.contentGaps.slice(0, 5).map((g: any) => g.title),
+                },
+              });
+
+              // 6. Cache result
+              await prisma.researchCache.create({
+                data: {
+                  query: cacheKey,
+                  queryType: 'competitor_analysis',
+                  results: analysis as any,
+                  source: analysis.dataSource,
+                  expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours
+                },
+              });
+
+              result = { success: true, analysis };
+              // We don't break here, we let the common JobService.updateJob below handle COMPLETED
+              break;
+            }
+          } catch (phaseErr: any) {
+            logger.error(`[Cron] Competitor Analysis Phase ${job.phase} failed:`, phaseErr);
+            throw phaseErr;
           }
-
-          // 5. Save analysis snapshot
-          await prisma.analysisSnapshot.create({
-            data: {
-              userId,
-              topicKeyword: topic.toLowerCase(),
-              snapshotData: analysis as any,
-              postCount: analysis.totalPostsAnalyzed,
-              avgEngagement: analysis.avgEngagement.likes + analysis.avgEngagement.comments,
-              topGaps: analysis.contentGaps.slice(0, 5).map((g: any) => g.title),
-            },
-          });
-
-          // 6. Cache result
-          await prisma.researchCache.create({
-            data: {
-              query: cacheKey,
-              queryType: 'competitor_analysis',
-              results: analysis as any,
-              source: analysis.dataSource,
-              expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours
-            },
-          });
-          
-          result = { success: true, analysis };
           break;
         }
 

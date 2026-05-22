@@ -131,6 +131,145 @@ export class CompetitorAnalyzer {
   private minimax = new AIClient();
   private fetcher = new LinkedInDataFetcher();
 
+  // Phase 0: Collect signals
+  async generatePhase0(topic: string, depth: 'quick' | 'deep'): Promise<any> {
+    logger.info(`[CompetitorAnalyzer Phase 0] Collecting signals for: "${topic}"`);
+    const realResearch = new RealCompetitorResearch();
+    
+    const [realSignalResult, communitySignal] = await Promise.all([
+      realResearch.collectSignalsWithBenchmark(topic, depth),
+      realResearch.collectCommunitySignal(topic),
+    ]);
+    
+    return {
+      realSignalResult,
+      communitySignal,
+    };
+  }
+
+  // Phase 1: Gap Analysis
+  async generatePhase1(topic: string, depth: 'quick' | 'deep', intermediateResult: any): Promise<any> {
+    logger.info(`[CompetitorAnalyzer Phase 1] Identifying gaps for: "${topic}"`);
+    const { realSignalResult, communitySignal } = intermediateResult;
+    const realResearch = new RealCompetitorResearch();
+    const gapEngine = new GapAnalysisEngine();
+    
+    const { posts: realPosts, rawBenchmark } = realSignalResult;
+    const realBenchmark = realResearch.extractBenchmarks(realPosts, topic, rawBenchmark);
+    
+    const [structuredGaps, legacyGapAnalysis] = await Promise.all([
+      gapEngine.identifyGaps(realPosts, realBenchmark, communitySignal, topic, depth),
+      this.runGapAnalysis([], topic, depth),
+    ]);
+    
+    return {
+      ...intermediateResult,
+      realBenchmark,
+      structuredGaps,
+      legacyGapAnalysis,
+    };
+  }
+
+  // Phase 2: Content Briefs & LinkedIn Fetch
+  async generatePhase2(topic: string, depth: 'quick' | 'deep', intermediateResult: any): Promise<any> {
+    logger.info(`[CompetitorAnalyzer Phase 2] Generating briefs for: "${topic}"`);
+    const gapEngine = new GapAnalysisEngine();
+    const { structuredGaps } = intermediateResult;
+    
+    const contentBriefs = await gapEngine.generateBriefs(structuredGaps, topic);
+    
+    const limit = depth === 'deep' ? 40 : 20;
+    const fetchedPosts = await this.fetcher.searchLinkedInPosts(topic, limit).catch(() => []);
+    
+    return {
+      ...intermediateResult,
+      contentBriefs,
+      fetchedPosts,
+    };
+  }
+
+  // Phase 3: Enrich & Final Analysis
+  async generatePhase3(existingPosts: any[], topic: string, depth: 'quick' | 'deep', intermediateResult: any): Promise<CompetitorAnalysis> {
+    logger.info(`[CompetitorAnalyzer Phase 3] Finalizing analysis for: "${topic}"`);
+    const { realSignalResult, communitySignal, realBenchmark, structuredGaps, legacyGapAnalysis, contentBriefs, fetchedPosts } = intermediateResult;
+    const { posts: realPosts } = realSignalResult;
+    
+    const rawPosts = [...existingPosts, ...fetchedPosts];
+    const enrichedPosts = await this.enrichPosts(
+      [
+        ...realPosts.map((rp: any) => ({
+          author: rp.authorType,
+          authorProfile: rp.url || '',
+          content: `${rp.hook}\n\n${rp.excerpt}`,
+          contentFormat: rp.format,
+          likes: rp.estimatedLikes,
+          comments: rp.estimatedComments,
+          shares: 0,
+          dataSource: rp.source,
+        })),
+        ...rawPosts,
+      ],
+      topic
+    );
+
+    const [
+      shareOfVoice,
+      formatBreakdown,
+      postingPatterns,
+      hashtagIntelligence,
+      viralAnalysis,
+    ] = await Promise.all([
+      this.analyzeShareOfVoice(enrichedPosts),
+      this.analyzeFormats(enrichedPosts),
+      this.analyzePostingPatterns(enrichedPosts),
+      this.analyzeHashtags(enrichedPosts),
+      this.analyzeViralPatterns(enrichedPosts, topic),
+    ]);
+
+    const avgLikes = this.mean(enrichedPosts.map((p: any) => p.likes));
+    const avgComments = this.mean(enrichedPosts.map((p: any) => p.comments));
+    const topPercentile = this.percentile(enrichedPosts.map((p: any) => p.likes + p.comments), 90);
+
+    return {
+      totalPostsAnalyzed: enrichedPosts.length,
+      dataSource: realPosts.length > 0 ? 'google_grounding' : 'ai_synthesis',
+      analyzedAt: new Date().toISOString(),
+      avgEngagement: {
+        likes: realBenchmark.avgEngagement.likes || Math.round(avgLikes),
+        comments: realBenchmark.avgEngagement.comments || Math.round(avgComments),
+        shares: realBenchmark.avgEngagement.shares,
+      },
+      medianEngagement: {
+        likes: this.median(enrichedPosts.map((p: any) => p.likes)),
+        comments: this.median(enrichedPosts.map((p: any) => p.comments)),
+      },
+      topPercentileThreshold: topPercentile,
+      engagementBenchmark: avgLikes > topPercentile * 0.5 ? 'above' : 'average',
+      shareOfVoice,
+      formatBreakdown,
+      topFormat: realBenchmark.dominantFormats[0]?.format || formatBreakdown[0]?.format || 'text',
+      postingPatterns,
+      hashtagIntelligence,
+      topHashtags: hashtagIntelligence.slice(0, 10).map((h: any) => h.tag),
+      viralPosts: enrichedPosts
+        .sort((a: any, b: any) => b.viralScore - a.viralScore)
+        .slice(0, 5),
+      viralPatterns: viralAnalysis.patterns,
+      contentGaps: structuredGaps.length > 0 ? structuredGaps as any : legacyGapAnalysis.gaps,
+      opportunities: contentBriefs.length > 0 ? contentBriefs.map((b: any) => `${b.headline}: ${b.whyItWins}`) : legacyGapAnalysis.opportunities,
+      threats: legacyGapAnalysis.threats,
+      topPosts: enrichedPosts
+        .sort((a: any, b: any) => (b.likes + b.comments) - (a.likes + a.comments))
+        .slice(0, 20),
+      allPosts: enrichedPosts,
+      benchmark: realBenchmark,
+      communitySignal,
+      structuredGaps,
+      contentBriefs,
+      isGrounded: realPosts.length > 0,
+    } as any;
+  }
+
   async analyze(
     existingPosts: any[],
     topic: string,
