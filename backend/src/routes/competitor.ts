@@ -223,7 +223,7 @@ router.get('/history/:topic', authenticate, async (req, res) => {
 router.post('/generate-from-gap', authenticate, async (req, res) => {
   try {
     const { gap, topic } = req.body;
-    const { JobService } = await import('../services/jobService');
+    const { JobService } = await import('../services/jobService.js');
     const jobId = await JobService.enqueue(
       'CONTENT_GENERATION',
       {
