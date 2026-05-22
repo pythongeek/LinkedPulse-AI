@@ -226,7 +226,7 @@ export class ImageGenerationService {
 
       for (let i = 0; i < count; i++) {
         const seed = Math.floor(Math.random() * 99999);
-        const imageUrl = `https://pollinations.ai/p/${encodedPrompt}?width=${dims.width}&height=${dims.height}&seed=${seed}&nologo=true&model=flux`;
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${dims.width}&height=${dims.height}&seed=${seed}&nologo=true&model=flux`;
 
         try {
           const response = await axios.get(imageUrl, {
