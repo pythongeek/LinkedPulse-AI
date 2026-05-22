@@ -1118,5 +1118,6 @@ export default function ContentStudio() {
         </div>
       </div>
     </div>
+    </div>
   );
 }
