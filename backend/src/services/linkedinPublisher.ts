@@ -206,4 +206,93 @@ export class LinkedInPublisher {
       throw new Error(`LinkedIn API Error: ${error.response?.data?.message || error.message}`);
     }
   }
+
+  /**
+   * Format and publish a complete content record to LinkedIn
+   */
+  static async publishContentRecord(content: any, accessToken: string, logger: any): Promise<string> {
+    // Determine the text to publish
+    let textToPublish = content.body || content.content || '';
+    if (textToPublish === 'undefined') {
+      textToPublish = '';
+    }
+
+    // Format poll
+    if (content.contentType === 'poll' && content.pollQuestion) {
+      const options = content.pollOptions as any;
+      let optionsText = '';
+      if (Array.isArray(options)) {
+        const numberEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+        optionsText = options
+          .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+          .map((opt: any, index: number) => {
+            const emoji = numberEmojis[index] || '🔹';
+            return `${emoji} ${opt.text}`;
+          })
+          .join('\n');
+      }
+      const prefix = textToPublish.trim() ? `${textToPublish}\n\n` : '';
+      textToPublish = `${prefix}📊 POLL:\n❓ ${content.pollQuestion}\n\n${optionsText}\n\n👇 Vote by replying with your choice in the comments!`;
+    }
+
+    // Format carousel
+    if (content.contentType === 'carousel' && content.slides) {
+      const slidesList = content.slides as any;
+      if (Array.isArray(slidesList) && slidesList.length > 0) {
+        const slidesText = slidesList
+          .sort((a: any, b: any) => (a.slideNumber || 0) - (b.slideNumber || 0))
+          .map((slide: any) => {
+            const slideHeader = `Slide ${slide.slideNumber}: ${slide.headline}`;
+            const slideBody = slide.body ? `\n   ${slide.body}` : '';
+            return `${slideHeader}${slideBody}`;
+          })
+          .join('\n\n');
+        const prefix = textToPublish.trim() ? `${textToPublish}\n\n` : '';
+        textToPublish = `${prefix}📖 CAROUSEL SLIDES OUTLINE:\n\n${slidesText}`;
+      }
+    }
+
+    if (!textToPublish.trim()) {
+      throw new Error('Content body is empty');
+    }
+
+    let postUrn = '';
+    const hasImage = Array.isArray(content.images) && content.images.length > 0 && typeof content.images[0] === 'string' && content.images[0].trim() !== '';
+
+    if (hasImage) {
+      try {
+        const imageUrlOrBase64 = (content.images as string[])[0];
+        let imageBuffer: Buffer;
+        
+        if (imageUrlOrBase64.startsWith('data:image')) {
+          const base64Data = imageUrlOrBase64.split(',')[1];
+          imageBuffer = Buffer.from(base64Data, 'base64');
+        } else {
+          const axios = (await import('axios')).default;
+          const imageRes = await axios.get(imageUrlOrBase64, { responseType: 'arraybuffer' });
+          imageBuffer = Buffer.from(imageRes.data);
+        }
+
+        const { uploadUrl, assetUrn } = await this.registerImageUpload(accessToken);
+        await this.uploadImageBinary(uploadUrl, imageBuffer, accessToken);
+        postUrn = await this.publishImage(textToPublish, assetUrn, accessToken);
+      } catch (imageUploadError) {
+        logger.error('Failed to upload and publish image, falling back to text post', imageUploadError);
+        postUrn = await this.publishText(textToPublish, accessToken);
+      }
+    } else {
+      postUrn = await this.publishText(textToPublish, accessToken);
+    }
+
+    if (content.firstComment) {
+      try {
+        await this.publishComment(postUrn, content.firstComment, accessToken);
+        logger.info(`Strategic first comment published automatically for post: ${postUrn}`);
+      } catch (commentError) {
+        logger.error(`Failed to publish automatic first comment for ${postUrn}:`, commentError);
+      }
+    }
+
+    return postUrn;
+  }
 }

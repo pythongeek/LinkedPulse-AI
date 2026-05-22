@@ -11,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Loader2,
@@ -30,7 +33,8 @@ import {
   FileText,
   User,
   Sliders,
-  CheckSquare
+  CheckSquare,
+  CalendarIcon
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -89,6 +93,9 @@ export default function ContentStudio() {
   const [jobPhase, setJobPhase] = useState<number>(0);
   const [jobTotalPhases, setJobTotalPhases] = useState<number>(1);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState<Date>();
+  const [scheduleTime, setScheduleTime] = useState('10:00');
+  const [isScheduling, setIsScheduling] = useState(false);
 
   const { data: linkedinStatus } = useQuery({
     queryKey: ['linkedinStatus'],
@@ -199,11 +206,37 @@ export default function ContentStudio() {
     try {
       await contentApi.publish(generatedContent.id);
       toast.success('Successfully published to LinkedIn!');
-      setGeneratedContent({ ...generatedContent, status: 'published' });
+      setGeneratedContent({ ...generatedContent, status: 'published', publishedAt: new Date().toISOString() });
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || 'Failed to publish to LinkedIn');
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const handleSchedule = async () => {
+    if (!generatedContent?.id || !scheduleDate) {
+      toast.error('Please select a date to schedule');
+      return;
+    }
+    
+    setIsScheduling(true);
+    try {
+      const [hours, minutes] = scheduleTime.split(':');
+      const scheduledFor = new Date(scheduleDate);
+      scheduledFor.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+
+      await contentApi.update(generatedContent.id, {
+        status: 'scheduled',
+        scheduledFor: scheduledFor.toISOString()
+      });
+      
+      toast.success('Successfully scheduled post!');
+      setGeneratedContent({ ...generatedContent, status: 'scheduled', scheduledFor: scheduledFor.toISOString() });
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to schedule post');
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -296,41 +329,46 @@ export default function ContentStudio() {
   };
 
   return (
-    <div className="space-y-6 text-foreground max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-sans">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/40 pb-4">
+    <div className="min-h-screen bg-background relative overflow-hidden font-sans">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[800px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[600px] h-[500px] bg-violet-600/10 blur-[100px] rounded-full pointer-events-none" />
+      
+      <div className="relative space-y-8 text-foreground max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 z-10">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/10 pb-6">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-indigo-400 bg-clip-text text-transparent">
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-br from-white via-indigo-200 to-violet-400 bg-clip-text text-transparent drop-shadow-sm">
             LinkedIn Content Studio
           </h1>
-          <p className="text-muted-foreground text-sm mt-1.5 max-w-2xl leading-normal">
+          <p className="text-muted-foreground/80 text-sm mt-2 max-w-2xl leading-relaxed">
             Generate algorithm-optimized, fact-checked, visual content and slides using our specialized LinkedIn agent pipeline.
           </p>
         </div>
         
         {/* System API Capability status indicators */}
-        <div className="flex flex-wrap items-center gap-2 bg-secondary/25 p-2 rounded-xl border border-border/40">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/60 text-[10px] font-bold text-foreground">
-            <span className="text-muted-foreground">Trends API:</span>
+        <div className="flex flex-wrap items-center gap-2 bg-white/5 backdrop-blur-md p-2 rounded-2xl border border-white/10 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/40 text-[10px] font-bold text-foreground border border-white/5 shadow-inner">
+            <span className="text-muted-foreground/80">Trends API:</span>
             {systemHealth?.capabilities?.hasRealTrends ? (
-              <span className="text-green-500 flex items-center gap-1">● Live</span>
+              <span className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)] flex items-center gap-1">● Live</span>
             ) : (
-              <span className="text-amber-500 flex items-center gap-1">▲ AI-only</span>
+              <span className="text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)] flex items-center gap-1">▲ AI-only</span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/60 text-[10px] font-bold text-foreground">
-            <span className="text-muted-foreground">Google Grounding:</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/40 text-[10px] font-bold text-foreground border border-white/5 shadow-inner">
+            <span className="text-muted-foreground/80">Google Grounding:</span>
             {systemHealth?.capabilities?.hasRealResearch ? (
-              <span className="text-green-500 flex items-center gap-1">● Live</span>
+              <span className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)] flex items-center gap-1">● Live</span>
             ) : (
-              <span className="text-amber-500 flex items-center gap-1">▲ Disabled</span>
+              <span className="text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)] flex items-center gap-1">▲ Disabled</span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/60 text-[10px] font-bold text-foreground">
-            <span className="text-muted-foreground">LinkedIn OAuth:</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/40 text-[10px] font-bold text-foreground border border-white/5 shadow-inner">
+            <span className="text-muted-foreground/80">LinkedIn OAuth:</span>
             {systemHealth?.capabilities?.hasLinkedInOAuth ? (
-              <span className="text-green-500 flex items-center gap-1">● Active</span>
+              <span className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)] flex items-center gap-1">● Active</span>
             ) : (
-              <span className="text-indigo-400 flex items-center gap-1">⬥ Cookie fallback</span>
+              <span className="text-violet-400 drop-shadow-[0_0_8px_rgba(167,139,250,0.5)] flex items-center gap-1">⬥ Cookie fallback</span>
             )}
           </div>
         </div>
@@ -339,10 +377,11 @@ export default function ContentStudio() {
       <div className="grid gap-6 lg:grid-cols-12 items-start">
         {/* Input Settings Panel (Grid col 5) */}
         <div className="lg:col-span-5 space-y-6">
-          <Card className="border border-border/80 shadow-md">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-bold">Content Configurations</CardTitle>
-              <CardDescription className="text-xs">Tailor the ghostwriting parameters for this campaign.</CardDescription>
+          <Card className="border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 pointer-events-none" />
+            <CardHeader className="pb-4 relative z-10">
+              <CardTitle className="text-xl font-bold bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">Content Configurations</CardTitle>
+              <CardDescription className="text-xs text-muted-foreground/80">Tailor the ghostwriting parameters for this campaign.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               {/* Topic Input */}
@@ -370,10 +409,10 @@ export default function ContentStudio() {
                         id={`format-card-${item.id}`}
                         onClick={() => setContentType(item.id)}
                         className={cn(
-                          'flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all duration-200 group',
+                          'flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all duration-300 group',
                           isSelected
-                            ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm'
-                            : 'border-border bg-card/45 hover:bg-accent/40 hover:border-muted-foreground/30'
+                            ? 'border-indigo-500/50 bg-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500'
+                            : 'border-white/10 bg-black/20 hover:bg-white/5 hover:border-white/20 hover:-translate-y-0.5 hover:shadow-lg'
                         )}
                       >
                         <div className={cn(
@@ -612,10 +651,10 @@ export default function ContentStudio() {
                   <Button
                     onClick={handleGenerate}
                     id="generate-button"
-                    className="w-full h-11 bg-primary hover:bg-primary/95 text-primary-foreground font-bold shadow-lg shadow-primary/20 transition-all duration-300 transform active:scale-[0.98]"
+                    className="w-full h-12 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-bold text-sm shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98] border border-white/10 rounded-xl"
                     disabled={isGenerating || generateMutation.isPending}
                   >
-                    <Wand2 className="mr-2 h-4 w-4" />
+                    <Wand2 className="mr-2 h-4 w-4 animate-pulse" />
                     Generate Optimized Campaign
                   </Button>
                 )}
@@ -626,27 +665,30 @@ export default function ContentStudio() {
 
         {/* Output Previews & Tabs (Grid col 7) */}
         <div className="lg:col-span-7">
-          <Card className="border border-border/80 shadow-md">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-bold">Campaign Content Deck</CardTitle>
-              <CardDescription className="text-xs">Evaluate and optimize your generated posts.</CardDescription>
+          <Card className="border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-bl from-violet-500/5 to-indigo-500/5 pointer-events-none" />
+            <CardHeader className="pb-4 relative z-10">
+              <CardTitle className="text-xl font-bold bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">Campaign Content Deck</CardTitle>
+              <CardDescription className="text-xs text-muted-foreground/80">Evaluate and optimize your generated posts.</CardDescription>
             </CardHeader>
             <CardContent>
               {generatedContent && (
-                <div className="grid grid-cols-3 gap-3 p-3 bg-secondary/30 rounded-xl border border-border/80 mb-5 text-center">
-                  <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-card/65 shadow-sm border border-border/30">
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Grounded Status</span>
-                    <Badge variant={generatedContent.isAiGrounded ? 'default' : 'secondary'} className={cn("text-[9px] font-bold py-0.5 px-2", generatedContent.isAiGrounded ? "bg-green-500 hover:bg-green-500 text-white" : "")}>
-                      {generatedContent.isAiGrounded ? "✓ GOOGLE SEARCH" : "AI ONLY"}
-                    </Badge>
+                <div className="grid grid-cols-3 gap-4 p-4 bg-black/20 rounded-2xl border border-white/5 mb-6 text-center shadow-inner">
+                  <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:bg-white/10 transition-colors">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest mb-2">Grounded Status</span>
+                    <div className={cn("px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,0,0,0.5)] border", generatedContent.isAiGrounded ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.15)]" : "bg-amber-500/10 text-amber-400 border-amber-500/20")}>
+                      {generatedContent.isAiGrounded ? <><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> GOOGLE SEARCH</> : <><div className="w-1.5 h-1.5 rounded-full bg-amber-400" /> AI ONLY</>}
+                    </div>
                   </div>
-                  <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-card/65 shadow-sm border border-border/30">
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Research Quality</span>
-                    <span className="text-xs font-black font-mono text-primary">{generatedContent.researchQuality || 50}%</span>
+                  <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:bg-white/10 transition-colors relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest mb-1 relative z-10">Research Quality</span>
+                    <span className="text-2xl font-black font-mono text-indigo-400 drop-shadow-[0_0_8px_rgba(129,140,248,0.5)] relative z-10">{generatedContent.researchQuality || 50}<span className="text-xs text-indigo-400/50">%</span></span>
                   </div>
-                  <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-card/65 shadow-sm border border-border/30">
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Verified Sources</span>
-                    <span className="text-xs font-black font-mono text-indigo-400">{generatedContent.dataSourceCount || 0} sites</span>
+                  <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-white/5 border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:bg-white/10 transition-colors relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-t from-violet-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest mb-1 relative z-10">Verified Sources</span>
+                    <span className="text-2xl font-black font-mono text-violet-400 drop-shadow-[0_0_8px_rgba(167,139,250,0.5)] relative z-10">{generatedContent.dataSourceCount || 0}<span className="text-xs text-violet-400/50 block -mt-1 font-sans">sites</span></span>
                   </div>
                 </div>
               )}
@@ -729,19 +771,54 @@ export default function ContentStudio() {
                               </p>
                             </div>
                           ) : (
-                            <Button 
-                              className="flex-1 bg-[#0a66c2] hover:bg-[#004182] text-white h-10 font-bold shadow-lg shadow-[#0a66c2]/20" 
-                              onClick={handlePublish}
-                              disabled={isPublishing || generatedContent.status === 'published'}
-                            >
-                              {isPublishing ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</>
-                              ) : generatedContent.status === 'published' ? (
-                                'Published ✓'
-                              ) : (
-                                'Publish to LinkedIn'
-                              )}
-                            </Button>
+                            <div className="flex flex-1 gap-2">
+                              <Button 
+                                className="flex-1 bg-[#0a66c2] hover:bg-[#004182] text-white h-10 font-bold shadow-lg shadow-[#0a66c2]/20" 
+                                onClick={handlePublish}
+                                disabled={isPublishing || generatedContent.status === 'published'}
+                              >
+                                {isPublishing ? (
+                                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</>
+                                ) : generatedContent.status === 'published' ? (
+                                  'Published ✓'
+                                ) : (
+                                  'Publish Now'
+                                )}
+                              </Button>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" className="h-10 px-3 bg-secondary text-foreground hover:bg-secondary/80 border-white/10" disabled={generatedContent.status === 'published' || generatedContent.status === 'scheduled'}>
+                                    <Clock className="h-4 w-4 mr-2" />
+                                    {generatedContent.status === 'scheduled' ? 'Scheduled ✓' : 'Schedule'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-4 bg-card border-border shadow-2xl">
+                                  <div className="space-y-4">
+                                    <h4 className="font-bold text-sm">Schedule Post</h4>
+                                    <Calendar
+                                      mode="single"
+                                      selected={scheduleDate}
+                                      onSelect={setScheduleDate}
+                                      className="rounded-md border border-white/5"
+                                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                    />
+                                    <div className="flex items-center gap-2">
+                                      <Label htmlFor="time" className="text-xs">Time</Label>
+                                      <Input
+                                        id="time"
+                                        type="time"
+                                        value={scheduleTime}
+                                        onChange={(e) => setScheduleTime(e.target.value)}
+                                        className="h-8 text-sm"
+                                      />
+                                    </div>
+                                    <Button onClick={handleSchedule} disabled={!scheduleDate || isScheduling} className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700">
+                                      {isScheduling ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : 'Confirm Schedule'}
+                                    </Button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
                           )}
                         </div>
                       </div>

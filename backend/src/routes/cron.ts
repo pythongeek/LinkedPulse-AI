@@ -34,10 +34,84 @@ router.get('/tick', async (req, res) => {
   }
 
   try {
+    // Process Scheduled Content First
+    try {
+      const now = new Date();
+      // Find all contents that are scheduled to be published now or earlier, and are still marked as 'scheduled'
+      const scheduledContents = await prisma.content.findMany({
+        where: {
+          status: 'scheduled',
+          scheduledFor: { lte: now },
+        },
+      });
+
+      for (const content of scheduledContents) {
+        try {
+          const userId = content.userId;
+
+          // Enforce 5 posts per day limit
+          const startOfDay = new Date();
+          startOfDay.setHours(0, 0, 0, 0);
+          
+          const publishedTodayCount = await prisma.content.count({
+            where: {
+              userId,
+              status: 'published',
+              publishedAt: { gte: startOfDay }
+            }
+          });
+
+          if (publishedTodayCount >= 5) {
+            logger.warn(`User ${userId} has reached the 5 posts/day limit. Rescheduling post ${content.id} for tomorrow.`);
+            const tomorrow = new Date(content.scheduledFor!);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            await prisma.content.update({
+              where: { id: content.id },
+              data: { scheduledFor: tomorrow }
+            });
+            continue;
+          }
+
+          // Fetch user's token
+          let accessToken = process.env.LINKEDIN_ACCESS_TOKEN;
+          const session = await prisma.linkedInSession.findUnique({ where: { userId } });
+          if (session && session.accessToken) {
+            accessToken = session.accessToken;
+          }
+
+          if (!accessToken) {
+            logger.error(`No LinkedIn access token for user ${userId}. Cannot auto-publish ${content.id}`);
+            await prisma.content.update({
+              where: { id: content.id },
+              data: { status: 'draft' } // Revert to draft if no token
+            });
+            continue;
+          }
+
+          const { LinkedInPublisher } = await import('../services/linkedinPublisher.js');
+          const postUrn = await LinkedInPublisher.publishContentRecord(content, accessToken, logger);
+
+          // Update status
+          await prisma.content.update({
+            where: { id: content.id },
+            data: {
+              status: 'published',
+              publishedAt: new Date(),
+            },
+          });
+          logger.info(`Successfully auto-published scheduled content ${content.id} (URN: ${postUrn})`);
+        } catch (publishErr) {
+          logger.error(`Failed to auto-publish content ${content.id}:`, publishErr);
+        }
+      }
+    } catch (schedErr) {
+      logger.error('Error processing scheduled content:', schedErr);
+    }
+
     const job = await JobService.getNextJob();
     
     if (!job) {
-      return res.json({ message: 'No pending jobs' });
+      return res.json({ message: 'No pending jobs, scheduled content checked' });
     }
 
     // Mark as processing
