@@ -25,7 +25,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  if (!slides || slides.length === 0) {
+  if (!slides || !Array.isArray(slides) || slides.length === 0) {
     return (
       <div className="p-8 text-center text-muted-foreground border border-dashed rounded-lg border-border bg-card/25">
         No slides generated. Try generating carousel content first.

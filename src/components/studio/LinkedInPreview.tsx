@@ -113,10 +113,10 @@ export const LinkedInPreview: React.FC<LinkedInPreviewProps & { images?: string[
             </div>
             <div>
               <div className="text-xs font-semibold font-sans text-foreground/80 line-clamp-1">
-                {slides?.[0]?.headline || 'Document Content Deck'}
+                {Array.isArray(slides) && slides[0]?.headline ? slides[0].headline : 'Document Content Deck'}
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5">
-                {slides ? slides.length : 10} slides • PDF
+                {Array.isArray(slides) ? slides.length : 10} slides • PDF
               </div>
             </div>
           </div>
