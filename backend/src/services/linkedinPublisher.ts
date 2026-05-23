@@ -208,6 +208,111 @@ export class LinkedInPublisher {
   }
 
   /**
+   * Register a document upload with LinkedIn Assets API
+   */
+  static async registerDocumentUpload(accessToken: string, authorUrn?: string): Promise<{ uploadUrl: string; assetUrn: string }> {
+    try {
+      const urn = authorUrn || await this.getAuthorUrn(accessToken);
+
+      const payload = {
+        registerUploadRequest: {
+          recipes: ['urn:li:digitalmediaRecipe:feedshare-document'],
+          owner: urn,
+          serviceRelationships: [
+            {
+              relationshipType: 'OWNER',
+              identifier: 'urn:li:userGeneratedContent',
+            },
+          ],
+        },
+      };
+
+      const response = await axios.post('https://api.linkedin.com/v2/assets?action=registerUpload', payload, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const uploadUrl = response.data.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
+      const assetUrn = response.data.value.asset;
+
+      return { uploadUrl, assetUrn };
+    } catch (error: any) {
+      logger.error('Failed to register LinkedIn document upload', error.response?.data || error.message);
+      throw new Error(`LinkedIn Assets API Error: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  /**
+   * Upload document binary to the provided uploadUrl
+   */
+  static async uploadDocumentBinary(uploadUrl: string, documentBuffer: Buffer, accessToken: string): Promise<void> {
+    try {
+      await axios.put(uploadUrl, documentBuffer, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/octet-stream',
+        },
+      });
+    } catch (error: any) {
+      logger.error('Failed to upload document binary to LinkedIn', error.response?.data || error.message);
+      throw new Error(`LinkedIn Document Upload Error: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  /**
+   * Publish a document post via UGC API
+   */
+  static async publishDocument(text: string, assetUrn: string, documentTitle: string, accessToken: string, authorUrn?: string): Promise<string> {
+    try {
+      const urn = authorUrn || await this.getAuthorUrn(accessToken);
+
+      const payload = {
+        author: urn,
+        lifecycleState: 'PUBLISHED',
+        specificContent: {
+          'com.linkedin.ugc.ShareContent': {
+            shareCommentary: {
+              text: text,
+            },
+            shareMediaCategory: 'DOCUMENT',
+            media: [
+              {
+                status: 'READY',
+                description: {
+                  text: documentTitle,
+                },
+                media: assetUrn,
+                title: {
+                  text: documentTitle,
+                }
+              },
+            ],
+          },
+        },
+        visibility: {
+          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+        },
+      };
+
+      const response = await axios.post('https://api.linkedin.com/v2/ugcPosts', payload, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data.id;
+    } catch (error: any) {
+      logger.error('Failed to publish document post to LinkedIn', error.response?.data || error.message);
+      throw new Error(`LinkedIn API Error: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  /**
    * Format and publish a complete content record to LinkedIn
    */
   static async publishContentRecord(content: any, accessToken: string, logger: any): Promise<string> {
@@ -235,53 +340,68 @@ export class LinkedInPublisher {
       textToPublish = `${prefix}📊 POLL:\n❓ ${content.pollQuestion}\n\n${optionsText}\n\n👇 Vote by replying with your choice in the comments!`;
     }
 
-    // Format carousel
+    let postUrn = '';
+
+    // Handle Carousel / PDF Generation
     if (content.contentType === 'carousel' && content.slides) {
       const slidesList = content.slides as any;
       if (Array.isArray(slidesList) && slidesList.length > 0) {
-        const slidesText = slidesList
-          .sort((a: any, b: any) => (a.slideNumber || 0) - (b.slideNumber || 0))
-          .map((slide: any) => {
-            const slideHeader = `Slide ${slide.slideNumber}: ${slide.headline}`;
-            const slideBody = slide.body ? `\n   ${slide.body}` : '';
-            return `${slideHeader}${slideBody}`;
-          })
-          .join('\n\n');
-        const prefix = textToPublish.trim() ? `${textToPublish}\n\n` : '';
-        textToPublish = `${prefix}📖 CAROUSEL SLIDES OUTLINE:\n\n${slidesText}`;
+        try {
+          const { PdfGeneratorService } = await import('./pdfGenerator.js');
+          const pdfBuffer = await PdfGeneratorService.generateCarouselPdf(slidesList, content.title || 'Carousel');
+          
+          const { uploadUrl, assetUrn } = await this.registerDocumentUpload(accessToken);
+          await this.uploadDocumentBinary(uploadUrl, pdfBuffer, accessToken);
+          
+          postUrn = await this.publishDocument(textToPublish, assetUrn, content.title || 'Document Content Deck', accessToken);
+        } catch (pdfError) {
+          logger.error('Failed to generate or upload PDF carousel, falling back to text post', pdfError);
+          // Fallback to text formatting
+          const slidesText = slidesList
+            .sort((a: any, b: any) => (a.slideNumber || 0) - (b.slideNumber || 0))
+            .map((slide: any) => {
+              const slideHeader = `Slide ${slide.slideNumber}: ${slide.headline}`;
+              const slideBody = slide.body ? `\n   ${slide.body}` : '';
+              return `${slideHeader}${slideBody}`;
+            })
+            .join('\n\n');
+          const prefix = textToPublish.trim() ? `${textToPublish}\n\n` : '';
+          textToPublish = `${prefix}📖 CAROUSEL SLIDES OUTLINE:\n\n${slidesText}`;
+        }
       }
     }
 
-    if (!textToPublish.trim()) {
-      throw new Error('Content body is empty');
-    }
+    if (!postUrn) {
+      if (!textToPublish.trim()) {
+        throw new Error('Content body is empty');
+      }
 
-    let postUrn = '';
-    const hasImage = Array.isArray(content.images) && content.images.length > 0 && typeof content.images[0] === 'string' && content.images[0].trim() !== '';
+      const hasImage = Array.isArray(content.images) && content.images.length > 0 && typeof content.images[0] === 'string' && content.images[0].trim() !== '';
 
-    if (hasImage) {
-      try {
-        const imageUrlOrBase64 = (content.images as string[])[0];
-        let imageBuffer: Buffer;
-        
-        if (imageUrlOrBase64.startsWith('data:image')) {
-          const base64Data = imageUrlOrBase64.split(',')[1];
-          imageBuffer = Buffer.from(base64Data, 'base64');
-        } else {
-          const axios = (await import('axios')).default;
-          const imageRes = await axios.get(imageUrlOrBase64, { responseType: 'arraybuffer' });
-          imageBuffer = Buffer.from(imageRes.data);
+      if (hasImage && content.contentType !== 'carousel') {
+        try {
+          const imageUrlOrBase64 = (content.images as string[])[0];
+          let imageBuffer: Buffer;
+          
+          if (imageUrlOrBase64.startsWith('data:image')) {
+            const base64Data = imageUrlOrBase64.split(',')[1];
+            imageBuffer = Buffer.from(base64Data, 'base64');
+          } else {
+            const axios = (await import('axios')).default;
+            const imageRes = await axios.get(imageUrlOrBase64, { responseType: 'arraybuffer' });
+            imageBuffer = Buffer.from(imageRes.data);
+          }
+
+          const { uploadUrl, assetUrn } = await this.registerImageUpload(accessToken);
+          await this.uploadImageBinary(uploadUrl, imageBuffer, accessToken);
+          postUrn = await this.publishImage(textToPublish, assetUrn, accessToken);
+        } catch (imageUploadError) {
+          logger.error('Failed to upload and publish image, falling back to text post', imageUploadError);
+          postUrn = await this.publishText(textToPublish, accessToken);
         }
-
-        const { uploadUrl, assetUrn } = await this.registerImageUpload(accessToken);
-        await this.uploadImageBinary(uploadUrl, imageBuffer, accessToken);
-        postUrn = await this.publishImage(textToPublish, assetUrn, accessToken);
-      } catch (imageUploadError) {
-        logger.error('Failed to upload and publish image, falling back to text post', imageUploadError);
+      } else {
         postUrn = await this.publishText(textToPublish, accessToken);
       }
-    } else {
-      postUrn = await this.publishText(textToPublish, accessToken);
     }
 
     if (content.firstComment) {
