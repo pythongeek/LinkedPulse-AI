@@ -23,7 +23,7 @@ export default function RelatedTopicsPanel({ research, onTopicClick }: RelatedTo
     value: q.value,
   }));
 
-  const allRising = [...risingItems, ...topItems.filter(t => !risingItems.some(r => r.label === t.label))];
+  const allRising = [...risingItems, ...topItems.filter((t: any) => !risingItems.some((r: any) => r.label === t.label))];
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
