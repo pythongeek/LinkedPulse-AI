@@ -34,7 +34,7 @@ export const PollFields: React.FC<PollFieldsProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+      <div className="flex flex-col gap-6 items-start">
         {/* Options Count Stepper */}
         <div className="space-y-2">
           <Label className="text-sm font-semibold">Number of Poll Options</Label>

@@ -96,7 +96,7 @@ export const PostFields: React.FC<PostFieldsProps> = ({
       </div>
 
       {/* CTA Type & Emoji Budget */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="flex flex-col gap-6">
         <div className="space-y-2">
           <Label className="text-sm font-semibold">Call to Action (CTA)</Label>
           <div className="flex flex-wrap gap-2">

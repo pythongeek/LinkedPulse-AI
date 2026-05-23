@@ -414,10 +414,9 @@ export default function ContentStudio() {
                 />
               </div>
 
-              {/* Visual Card Selector for Content Type */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Content Format</Label>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 gap-3">
                   {Object.values(CONTENT_TYPE_CONFIGS).map((item) => {
                     const isSelected = contentType === item.id;
                     return (
@@ -470,7 +469,7 @@ export default function ContentStudio() {
                   Audience & Voice Context
                 </h4>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">Creator Persona</Label>
                     <Select value={personaId} onValueChange={setPersonaId}>
@@ -502,7 +501,7 @@ export default function ContentStudio() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">Target Audience</Label>
                     <Input
