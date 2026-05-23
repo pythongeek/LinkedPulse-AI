@@ -1,4 +1,4 @@
-import PDFDocument from 'pdfkit';
+import PDFDocument = require('pdfkit');
 import { logger } from '../utils/logger';
 
 export interface SlideData {
