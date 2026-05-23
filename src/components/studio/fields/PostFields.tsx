@@ -63,7 +63,7 @@ export const PostFields: React.FC<PostFieldsProps> = ({
           </TooltipProvider>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5">
           {HOOK_FORMULAS.map((formula) => {
             const isSelected = hookFormula === formula.id;
             return (
@@ -73,22 +73,24 @@ export const PostFields: React.FC<PostFieldsProps> = ({
                 id={`hook-formula-${formula.id}`}
                 onClick={() => onHookFormulaChange(formula.id)}
                 className={cn(
-                  'flex flex-col p-3 rounded-lg border text-left transition-all duration-200 select-none group',
+                  'flex items-start gap-3 p-3 rounded-lg border text-left transition-all duration-200 select-none group',
                   isSelected
                     ? 'border-primary bg-primary/5 ring-1 ring-primary'
                     : 'border-border bg-card hover:bg-accent/40 hover:border-muted-foreground/30'
                 )}
               >
-                <span className="text-xl mb-1">{formula.emoji}</span>
-                <span className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors">
-                  {formula.label}
-                </span>
-                <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
-                  {formula.desc}
-                </span>
-                <span className="hidden sm:block text-[9px] text-muted-foreground/60 italic mt-1 line-clamp-2 leading-normal">
-                  {formula.eg}
-                </span>
+                <span className="text-2xl mt-0.5">{formula.emoji}</span>
+                <div className="flex flex-col">
+                  <span className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                    {formula.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground mt-0.5">
+                    {formula.desc}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/60 italic mt-1 leading-relaxed">
+                    {formula.eg}
+                  </span>
+                </div>
               </button>
             );
           })}
