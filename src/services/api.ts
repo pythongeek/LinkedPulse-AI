@@ -60,7 +60,13 @@ export const trendApi = {
   getTrending: () => api.get('/trends/trending'),
   getOpportunities: () => api.get('/trends/opportunities'),
   getOpportunityScore: (topic: string) => api.post('/trends/opportunity-score', { topic }),
+  getRelated: (topic: string) => api.get(`/trends/related/${encodeURIComponent(topic)}`),
+  compare: (topics: string[]) => api.post('/trends/compare', { topics }),
+  share: (analysisData: any, keyword: string) => api.post('/trends/share', { analysisData, keyword }),
+  getShared: (shareId: string) => api.get(`/trends/share/${shareId}`),
+  exportPdf: (analysisData: any) => api.post('/trends/export', { analysisData }, { responseType: 'blob' }),
 };
+
 
 // Competitor API
 export const competitorApi = {
@@ -99,7 +105,13 @@ export const userApi = {
   getAlerts: () => api.get('/user/alerts'),
   markAlertRead: (id: string) => api.put(`/user/alerts/${id}/read`),
   updateProfile: (data: any) => api.put('/user/profile', data),
+  // Watchlist
+  getWatchlist: () => api.get('/user/watchlist'),
+  addToWatchlist: (data: any) => api.post('/user/watchlist', data),
+  removeFromWatchlist: (id: string) => api.delete(`/user/watchlist/${id}`),
+  updateWatchlistItem: (id: string, data: any) => api.put(`/user/watchlist/${id}`, data),
 };
+
 
 // LinkedIn API
 export const linkedinApi = {

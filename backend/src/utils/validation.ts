@@ -46,10 +46,29 @@ export const contentGenerationSchema = z.object({
 
 // Trend analysis validation schema
 export const trendAnalysisSchema = z.object({
-  keywords: z.array(z.string().min(1)).min(1).max(5),
-  timeframe: z.enum(['today 1-m', 'today 3-m', 'today 12-m', 'all']).default('today 3-m'),
+  keywords: z.array(z.string().min(1)).min(1).max(2),
+  timeframe: z.enum(['today 7-d', 'today 1-m', 'today 3-m', 'today 12-m', 'all']).default('today 3-m'),
   geo: z.string().default('US'),
+  // New targeting fields (Phase 1.3)
+  contentTypeTarget: z.enum(['post', 'carousel', 'article', 'poll']).optional(),
+  topicType: z.enum([
+    'thought_leadership', 'industry_news', 'how_to', 'career_professional',
+    'data_insights', 'case_study', 'product_launch', 'community_question'
+  ]).optional(),
+  audienceSegment: z.enum([
+    'c_suite', 'founders', 'managers', 'individual_contributors',
+    'recruiters_hr', 'investors_vcs', 'general_professionals'
+  ]).optional(),
+  industryVertical: z.string().optional(),
+  isBtoB: z.boolean().default(true),
+  personaId: z.string().uuid().optional(),
+  competitorContext: z.string().max(500).optional(),
+  existingContentContext: z.string().max(2000).optional(),
+  customResearchDirective: z.string().max(1000).optional(),
+  researchDepth: z.enum(['quick', 'deep']).default('quick'),
+  noCache: z.boolean().optional(),
 });
+
 
 // LinkedIn cookies validation schema
 export const linkedinCookiesSchema = z.object({

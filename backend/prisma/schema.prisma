@@ -25,9 +25,11 @@ model User {
   topicAlerts         TopicAlert[]
   usageStats          UsageStats?
   competitorProfiles  CompetitorProfile[]
+  topicWatchlist      TopicWatchlist[]
   
   @@map("users")
 }
+
 
 model Persona {
   id              String   @id @default(uuid())
@@ -370,3 +372,23 @@ model ApiHealthLog {
   
   @@map("api_health_logs")
 }
+
+model TopicWatchlist {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  keyword         String
+  contentType     String?   @map("content_type")
+  topicType       String?   @map("topic_type")
+  audienceSegment String?   @map("audience_segment")
+  alertThreshold  Int       @default(70) @map("alert_threshold")
+  isActive        Boolean   @default(true) @map("is_active")
+  lastChecked     DateTime? @map("last_checked")
+  latestScore     Float?    @map("latest_score")
+  latestVelocity  String?   @map("latest_velocity")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("topic_watchlist")
+}
+

@@ -21,6 +21,8 @@ export interface RedditSignal {
   sentiment: 'positive' | 'neutral' | 'negative' | 'mixed';
   weeklyPostCount: number;
   isDataReal: boolean;
+  painPoints?: string[];
+  unansweredQuestions?: string[];
 }
 
 export class RedditSignalService {
@@ -51,6 +53,8 @@ export class RedditSignalService {
            "weeklyPostCount": 1-1000,
            "hotAngles": ["angle 1", "angle 2"],
            "activeSubreddits": ["r/saas", "r/marketing"],
+           "painPoints": ["specific pain 1", "specific pain 2"],
+           "unansweredQuestions": ["question 1?", "question 2?"],
            "topPosts": [
              {
                "title": "Post title",
@@ -82,6 +86,8 @@ export class RedditSignalService {
         sentiment: parsed.sentiment || 'neutral',
         weeklyPostCount: parsed.weeklyPostCount || 0,
         isDataReal: true,
+        painPoints: parsed.painPoints || [],
+        unansweredQuestions: parsed.unansweredQuestions || [],
       };
     } catch (error) {
       logger.error('RedditSignalService error:', error);
@@ -99,6 +105,8 @@ export class RedditSignalService {
       sentiment: 'neutral',
       weeklyPostCount: 0,
       isDataReal: false,
+      painPoints: [],
+      unansweredQuestions: [],
     };
   }
 }
