@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
@@ -10,19 +11,26 @@ import DashboardLayout from './layouts/DashboardLayout';
 // Auth
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Pages
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Personas from './pages/Personas';
-import PersonaCreate from './pages/PersonaCreate';
-import ContentStudio from './pages/ContentStudio';
-import ContentHistory from './pages/ContentHistory';
-import TrendExplorer from './pages/TrendExplorer';
-import CompetitorAnalysis from './pages/CompetitorAnalysis';
-import ProfileAudit from './pages/ProfileAudit';
-import Settings from './pages/Settings';
-import ImageGenerator from './pages/ImageGenerator';
+// Pages - Lazy Loaded for Code Splitting (Bolt Performance Optimization)
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Personas = lazy(() => import('./pages/Personas'));
+const PersonaCreate = lazy(() => import('./pages/PersonaCreate'));
+const ContentStudio = lazy(() => import('./pages/ContentStudio'));
+const ContentHistory = lazy(() => import('./pages/ContentHistory'));
+const TrendExplorer = lazy(() => import('./pages/TrendExplorer'));
+const CompetitorAnalysis = lazy(() => import('./pages/CompetitorAnalysis'));
+const ProfileAudit = lazy(() => import('./pages/ProfileAudit'));
+const Settings = lazy(() => import('./pages/Settings'));
+const ImageGenerator = lazy(() => import('./pages/ImageGenerator'));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+  </div>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +47,7 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <BrowserRouter>
+            <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* Public Auth Routes */}
               <Route path="/login" element={<Login />} />
@@ -65,6 +74,7 @@ function App() {
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
+            </Suspense>
           </BrowserRouter>
           <Toaster position="top-right" richColors />
         </AuthProvider>
