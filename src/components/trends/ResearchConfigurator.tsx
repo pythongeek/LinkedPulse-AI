@@ -91,7 +91,7 @@ export default function ResearchConfigurator({
       audienceSegment,
       industryVertical: industryVertical || industryInput,
       timeframe,
-      geo,
+      geo: geo === 'GLOBAL' ? '' : geo,
       personaId: personaId || undefined,
       isBtoB,
       compareWith: compareWith.trim() || undefined,
@@ -290,7 +290,7 @@ export default function ResearchConfigurator({
                 </SelectTrigger>
                 <SelectContent>
                   {GEO_OPTIONS.map(({ code, label }) => (
-                    <SelectItem key={code || 'global'} value={code} className="text-xs">{label}</SelectItem>
+                    <SelectItem key={code || 'GLOBAL'} value={code || 'GLOBAL'} className="text-xs">{label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -438,7 +438,7 @@ export default function ResearchConfigurator({
               onClick={() => onSaveAlert({
                 keyword, contentTypeTarget, topicType, audienceSegment,
                 industryVertical: industryVertical || industryInput,
-                timeframe, geo, personaId: personaId || undefined, isBtoB,
+                timeframe, geo: geo === 'GLOBAL' ? '' : geo, personaId: personaId || undefined, isBtoB,
                 compareWith: compareWith || undefined, researchDepth,
               })}
               disabled={!keyword.trim()}
