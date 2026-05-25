@@ -30,6 +30,7 @@ import RelatedTopicsPanel from '../components/trends/RelatedTopicsPanel';
 import AlgorithmCompliancePanel from '../components/trends/AlgorithmCompliancePanel';
 import ComparisonView from '../components/trends/ComparisonView';
 import TopicWatchlist from '../components/trends/TopicWatchlist';
+import { QuickGenerateDialog } from '../components/studio/QuickGenerateDialog';
 
 import type { TrendResearchConfig, ContentTypeTarget } from '../types/trendExplorer';
 
@@ -109,6 +110,11 @@ export default function TrendExplorer() {
   const [config, setConfig] = useState<TrendResearchConfig | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [initialKeyword, setInitialKeyword] = useState(searchParams.get('keyword') || '');
+  
+  // Inline Generation God Mode State
+  const [generateTopic, setGenerateTopic] = useState('');
+  const [generateFormat, setGenerateFormat] = useState('post');
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
 
   // Opportunities sidebar
   const { data: opportunitiesData } = useQuery({
@@ -196,11 +202,13 @@ export default function TrendExplorer() {
 
   const handleGenerateNow = (contentType: string) => {
     const keyword = config?.keyword || analysisResult?.data?.meta?.keyword;
-    navigate(`/content/studio?${new URLSearchParams({
-      topic: keyword || '',
-      contentType,
-      researchDepth: 'quick',
-    }).toString()}`);
+    if (keyword) {
+      setGenerateTopic(keyword);
+      setGenerateFormat(contentType);
+      setIsGenerateModalOpen(true);
+    } else {
+      toast.error('No topic selected for generation');
+    }
   };
 
   const handleSwitchFormat = (format: string) => {
@@ -597,6 +605,13 @@ export default function TrendExplorer() {
           </Card>
         )}
       </main>
+
+      <QuickGenerateDialog 
+        isOpen={isGenerateModalOpen} 
+        onClose={() => setIsGenerateModalOpen(false)} 
+        topic={generateTopic} 
+        contentType={generateFormat} 
+      />
     </div>
   );
 }

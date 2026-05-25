@@ -215,4 +215,29 @@ router.get('/export/:topicId', authenticate, async (req, res) => {
   res.json({ posts });
 });
 
+/**
+ * Generate 90-day AI Overtake Strategy
+ * POST /api/competitor/strategy
+ */
+router.post('/strategy', authenticate, async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: { message: 'Prompt is required' } });
+    }
+    
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    
+    res.json({ strategy: text });
+  } catch (error) {
+    logger.error('Generate strategy error:', error);
+    res.status(500).json({ error: { message: 'Failed to generate strategy' } });
+  }
+});
+
 export default router;

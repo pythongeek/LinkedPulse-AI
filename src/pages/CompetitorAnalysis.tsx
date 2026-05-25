@@ -21,6 +21,7 @@ import {
   PieChart as RePieChart, Pie, Cell, RadarChart, Radar,
   PolarGrid, PolarAngleAxis,
 } from 'recharts';
+import { QuickGenerateDialog } from '../components/studio/QuickGenerateDialog';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -47,6 +48,17 @@ export default function CompetitorAnalysis() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  
+  // Inline Generation God Mode State
+  const [generateTopic, setGenerateTopic] = useState('');
+  const [generateFormat, setGenerateFormat] = useState('post');
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+
+  const handleGenerateClick = (topic: string, format: string = 'post') => {
+    setGenerateTopic(topic);
+    setGenerateFormat(format);
+    setIsGenerateModalOpen(true);
+  };
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [showSavedReports, setShowSavedReports] = useState(false);
   const [isGeneratingStrategy, setIsGeneratingStrategy] = useState(false);
@@ -314,17 +326,8 @@ What to measure to know you're winning.
 Be specific, tactical, and brutal. No generic advice. Every recommendation must be directly tied to the gap data above.`;
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      });
-      const data = await response.json();
-      const text = data.content?.map((b: any) => b.type === 'text' ? b.text : '').join('') || '';
+      const response = await competitorApi.generateStrategy({ prompt });
+      const text = response.data.strategy || '';
       setOvertakeStrategy(text);
       setTimeout(() => strategyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       toast.success('Overtake strategy generated!');
@@ -621,7 +624,7 @@ Be specific, tactical, and brutal. No generic advice. Every recommendation must 
                         </div>
                         <p className="text-xs text-muted-foreground mb-3">📈 Est. lift: <span className="font-semibold">{gap.estimatedEngagementLift}</span></p>
                         <Button size="sm" className="w-full bg-indigo-600 hover:bg-indigo-700"
-                          onClick={() => window.location.href = `/content/studio?topic=${encodeURIComponent(gap.opportunity)}&contentType=${gap.suggestedFormat || 'post'}`}>
+                          onClick={() => handleGenerateClick(gap.opportunity, gap.suggestedFormat || 'post')}>
                           <Sparkles className="mr-1 h-3 w-3" /> Generate Now →
                         </Button>
                       </div>
@@ -665,7 +668,7 @@ Be specific, tactical, and brutal. No generic advice. Every recommendation must 
                     <p className="text-sm text-green-700 dark:text-green-400 font-medium bg-green-50 dark:bg-green-950/30 px-3 py-2 rounded-lg border border-green-200 dark:border-green-800 mb-4">
                       ✅ {brief.whyItWins}
                     </p>
-                    <Button className="w-full" onClick={() => window.location.href = `/content/studio?topic=${encodeURIComponent(brief.angle)}&contentType=${brief.recommendedFormat || 'post'}`}>
+                    <Button className="w-full" onClick={() => handleGenerateClick(brief.angle, brief.recommendedFormat || 'post')}>
                       <ArrowUpRight className="mr-2 h-4 w-4" /> Generate This Now →
                     </Button>
                   </div>
@@ -929,6 +932,13 @@ Be specific, tactical, and brutal. No generic advice. Every recommendation must 
           )}
         </div>
       )}
+
+      <QuickGenerateDialog 
+        isOpen={isGenerateModalOpen} 
+        onClose={() => setIsGenerateModalOpen(false)} 
+        topic={generateTopic} 
+        contentType={generateFormat} 
+      />
     </div>
   );
 }

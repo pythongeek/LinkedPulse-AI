@@ -198,7 +198,7 @@ export class CompetitorAnalyzer {
     const enrichedPosts = await this.enrichPosts(
       [
         ...realPosts.map((rp: any) => ({
-          author: rp.authorType,
+          author: rp.authorName || rp.authorType || 'LinkedIn Creator',
           authorProfile: rp.url || '',
           content: `${rp.hook}\n\n${rp.excerpt}`,
           contentFormat: rp.format,
@@ -310,7 +310,7 @@ export class CompetitorAnalyzer {
       [
         // Convert real grounded posts into EnrichedPost-compatible shape
         ...realPosts.map(rp => ({
-          author: rp.authorType,
+          author: rp.authorName || rp.authorType || 'LinkedIn Creator',
           authorProfile: rp.url || '',
           content: `${rp.hook}\n\n${rp.excerpt}`,
           contentFormat: rp.format,

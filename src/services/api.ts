@@ -81,6 +81,7 @@ export const competitorApi = {
     api.get(`/competitor/export/${topicId}?format=${format}`, {
       responseType: format === 'csv' ? 'blob' : 'json',
     }),
+  generateStrategy: (data: { prompt: string }) => api.post('/competitor/strategy', data),
 };
 
 // Audit API

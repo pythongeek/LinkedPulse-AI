@@ -11,6 +11,7 @@ export interface RealPost {
   format: 'post' | 'carousel' | 'article' | 'poll' | 'video';
   hook: string;
   angle: string;
+  authorName?: string;
   authorType: 'thought_leader' | 'brand' | 'practitioner' | 'agency';
   url?: string;
   source: 'google_grounding' | 'community_signal';
@@ -49,7 +50,8 @@ Find real posts, articles, or discussions that are performing well. For each res
 - What format are they using (text post, carousel, poll, article, video)?
 - What is the opening hook or headline?
 - Estimate engagement level (likes/comments) based on any visible signals in snippets
-- Who is creating this content? (thought_leader, brand, practitioner, agency)
+- What is the author's real name or brand name?
+- What is their creator type? (thought_leader, brand, practitioner, agency)
 
 Find ${postCount} distinct pieces of content. Base your analysis on actual search results you find.
 
@@ -64,6 +66,7 @@ Return JSON ONLY — no prose before or after:
       "format": "carousel",
       "hook": "The opening line or headline",
       "angle": "The specific perspective being argued",
+      "authorName": "Real Name of Creator",
       "authorType": "thought_leader",
       "url": "https://...",
       "source": "google_grounding"
@@ -129,6 +132,7 @@ Return JSON ONLY:
       "format": "carousel",
       "hook": "The opening line or headline",
       "angle": "The specific perspective being argued",
+      "authorName": "Real Name of Creator",
       "authorType": "thought_leader",
       "url": "https://...",
       "source": "google_grounding"
