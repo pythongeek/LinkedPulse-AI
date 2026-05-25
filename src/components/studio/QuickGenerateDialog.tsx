@@ -52,7 +52,8 @@ export function QuickGenerateDialog({ isOpen, onClose, topic, contentType = 'pos
       if (!jobId) return;
       
       try {
-        const res = await jobApi.getStatus(jobId);
+        // We use advance to force the backend to process the next phase immediately
+        const res = await jobApi.advance(jobId);
         const job = res.data.job;
         if (job.phase !== undefined) setJobPhase(job.phase);
         if (job.totalPhases !== undefined) setJobTotalPhases(job.totalPhases);

@@ -350,4 +350,215 @@ router.get('/status/:id', async (req, res) => {
   }
 });
 
+/**
+ * Process a specific job (for frontend polling)
+ */
+router.post('/advance/:id', async (req, res) => {
+  try {
+    const job = await JobService.getJob(req.params.id);
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    
+    if (job.status !== 'PENDING') {
+      return res.json({ job });
+    }
+
+    // Mark as processing
+    await JobService.markAsProcessing(job.id);
+    logger.info(`Advancing job ${job.id} (${job.type}) Phase ${job.phase}`);
+
+    const payload = job.payload as any;
+    let result;
+
+    try {
+      switch (job.type) {
+        case 'CONTENT_GENERATION': {
+          const contentService = new ContentGenerationService();
+          const { options, userId } = payload;
+          
+          if (job.phase === 0) {
+            const p0Result = await contentService.generatePhase0(options);
+            await JobService.progressToNextPhase(job.id, 1, p0Result);
+            return res.json({ message: 'Phase 0 complete', job: await JobService.getJob(job.id) });
+          } else if (job.phase === 1) {
+            const p1Result = await contentService.generatePhase1(options, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 2, p1Result);
+            return res.json({ message: 'Phase 1 complete', job: await JobService.getJob(job.id) });
+          } else if (job.phase === 2) {
+            const p2Result = await contentService.generatePhase2(options, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 3, p2Result);
+            return res.json({ message: 'Phase 2 complete', job: await JobService.getJob(job.id) });
+          } else if (job.phase === 3) {
+            const p3Result = await contentService.generatePhase3(options, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 4, p3Result);
+            return res.json({ message: 'Phase 3 complete', job: await JobService.getJob(job.id) });
+          } else if (job.phase === 4) {
+            const p4Result = await contentService.generatePhase4(options, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 5, p4Result);
+            return res.json({ message: 'Phase 4 complete', job: await JobService.getJob(job.id) });
+          } else if (job.phase === 5) {
+            const genResult = await contentService.generatePhase5(options, job.intermediateResult);
+            
+            const savedContent = await prisma.content.create({
+              data: {
+                userId,
+                contentType: options.contentType,
+                title: genResult.title,
+                body: genResult.content,
+                outline: options.outline || genResult.outline,
+                researchData: genResult.researchData,
+                sources: genResult.sources,
+                images: genResult.images || [],
+                status: 'draft',
+                engagementPrediction: genResult.engagementPrediction,
+                seoScore: genResult.seoScore,
+                hookSuggestions: genResult.hookSuggestions,
+                bestPostingTime: genResult.bestPostingTime,
+                linkedinOptimization: genResult.linkedinOptimization,
+                competitiveAnalysis: genResult.competitiveAnalysis,
+                slides: (genResult.slides || null) as any,
+                firstComment: genResult.firstComment || null,
+                hookFormula: options.hookFormula || null,
+                charCount: genResult.charCount || null,
+                wordCount: genResult.wordCount || null,
+                pollQuestion: genResult.pollQuestion || null,
+                pollOptions: (genResult.pollOptions || null) as any,
+                pollDuration: options.pollDuration || null,
+                articleTitle: genResult.articleTitle || null,
+                articleExcerpt: genResult.articleExcerpt || null,
+                researchQuality: genResult.researchQuality || null,
+                dataSourceCount: genResult.dataSourceCount || null,
+                isAiGrounded: genResult.isAiGrounded ?? false,
+              },
+            });
+
+            await prisma.usageStats.updateMany({
+              where: { userId },
+              data: { contentsGenerated: { increment: 1 } },
+            });
+
+            result = { success: true, contentId: savedContent.id };
+          }
+          break;
+        }
+        case 'COMPETITOR_ANALYSIS': {
+          const { CompetitorAnalyzer } = await import('../services/competitorAnalyzer.js');
+          const analyzer = new CompetitorAnalyzer();
+          const { topic, depth, userId, cacheKey } = payload;
+          
+          if (job.phase === 0) {
+            const p0Result = await analyzer.generatePhase0(topic, depth);
+            await JobService.progressToNextPhase(job.id, 1, p0Result);
+            return res.json({ message: 'Competitor Phase 0 complete', job: await JobService.getJob(job.id) });
+          } else if (job.phase === 1) {
+            const p1Result = await analyzer.generatePhase1(topic, depth, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 2, p1Result);
+            return res.json({ message: 'Competitor Phase 1 complete', job: await JobService.getJob(job.id) });
+          } else if (job.phase === 2) {
+            const p2Result = await analyzer.generatePhase2(topic, depth, job.intermediateResult);
+            await JobService.progressToNextPhase(job.id, 3, p2Result);
+            return res.json({ message: 'Competitor Phase 2 complete', job: await JobService.getJob(job.id) });
+          } else if (job.phase === 3) {
+            const analysis = await analyzer.generatePhase3([], topic, depth, job.intermediateResult);
+
+            const topicRecord = await prisma.topic.upsert({
+              where: { keyword: topic.toLowerCase() },
+              update: { competitionData: analysis as any, lastAnalyzed: new Date() },
+              create: { keyword: topic.toLowerCase(), competitionData: analysis as any, lastAnalyzed: new Date() },
+            });
+
+            if (analysis.allPosts.length > 0) {
+              await prisma.competitorPost.createMany({
+                data: analysis.allPosts.map((post: any) => ({
+                  topicId: topicRecord.id,
+                  author: post.author,
+                  authorProfile: post.authorProfile,
+                  content: post.content,
+                  hookText: post.hookText,
+                  contentFormat: post.contentFormat,
+                  likes: post.likes,
+                  comments: post.comments,
+                  shares: post.shares,
+                  engagementRate: post.engagementRate,
+                  viralScore: post.viralScore,
+                  wordCount: post.wordCount,
+                  emojiCount: post.emojiCount,
+                  hashtagsUsed: post.hashtagsUsed,
+                  hasMedia: post.hasMedia,
+                  hasLink: post.hasLink,
+                  ctaPresent: post.ctaPresent,
+                  dayOfWeek: post.dayOfWeek >= 0 ? post.dayOfWeek : null,
+                  hourPosted: post.hourPosted >= 0 ? post.hourPosted : null,
+                  postUrl: post.postUrl,
+                  postedAt: post.postedAt ? new Date(post.postedAt) : null,
+                  dataSource: post.dataSource,
+                })),
+                skipDuplicates: true,
+              });
+            }
+
+            await prisma.analysisSnapshot.create({
+              data: {
+                userId,
+                topicKeyword: topic.toLowerCase(),
+                snapshotData: analysis as any,
+                postCount: analysis.totalPostsAnalyzed,
+                avgEngagement: analysis.avgEngagement.likes + analysis.avgEngagement.comments,
+                topGaps: analysis.contentGaps.slice(0, 5).map((g: any) => g.title),
+              },
+            });
+
+            await prisma.researchCache.create({
+              data: {
+                query: cacheKey,
+                queryType: 'competitor_analysis',
+                results: analysis as any,
+                source: analysis.dataSource,
+                expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000),
+              },
+            });
+
+            result = { success: true, analysis };
+          }
+          break;
+        }
+        case 'LINKEDIN_SCRAPE': {
+          const scraper = new LinkedInScraper();
+          const { topic, cookies, limit } = payload;
+          const posts = await scraper.scrapeTopicPosts(topic, cookies, limit);
+          result = { success: true, count: posts.length, posts };
+          break;
+        }
+        default:
+          throw new Error(`Unknown job type: ${job.type}`);
+      }
+
+      await JobService.updateJob(job.id, {
+        status: 'COMPLETED',
+        result: result as any,
+      });
+      
+      logger.info(`Job ${job.id} completed successfully`);
+      return res.json({ job: await JobService.getJob(job.id) });
+    } catch (error) {
+      logger.error(`Job ${job.id} failed:`, error);
+      
+      const attempts = (job.attempts || 0) + 1;
+      const shouldRetry = attempts < (job.maxAttempts || 3);
+      
+      await JobService.updateJob(job.id, {
+        status: shouldRetry ? 'PENDING' : 'FAILED',
+        error: error instanceof Error ? error.message : String(error),
+        attempts,
+        runAt: shouldRetry ? new Date(Date.now() + 1000 * 60 * Math.pow(2, attempts)) : job.runAt,
+      });
+      return res.json({ job: await JobService.getJob(job.id) });
+    }
+  } catch (error) {
+    logger.error('Advance job error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

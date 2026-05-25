@@ -52,6 +52,7 @@ export const contentApi = {
 // Job API
 export const jobApi = {
   getStatus: (id: string) => api.get(`/cron/status/${id}`),
+  advance: (id: string) => api.post(`/cron/advance/${id}`),
 };
 
 // Trend API
