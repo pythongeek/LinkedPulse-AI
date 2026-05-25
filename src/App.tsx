@@ -41,8 +41,10 @@ function App() {
           <BrowserRouter>
             <Routes>
               {/* Public Auth Routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+              <Route element={<AuthLayout />}>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+              </Route>
 
               {/* Protected Dashboard Routes */}
               <Route element={<ProtectedRoute />}>
