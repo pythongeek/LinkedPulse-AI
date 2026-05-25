@@ -59,7 +59,7 @@ export class LinkedInContentGapAnalyzer {
     const allContent = [...linkedinPosts, ...generalContent];
     if (allContent.length === 0) return [];
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const titles = allContent.map(c => c.title).join('\n');
 
     try {
@@ -84,7 +84,7 @@ Return ONLY a JSON array of strings.`
     personaContext?: string
   ): Promise<Omit<GapAnalysisResult, 'topic' | 'totalGapsFound' | 'contentCalendarSuggestions'>> {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       tools: [{ googleSearch: {} } as any],
     });
 
@@ -150,7 +150,7 @@ Return JSON:
   ): Promise<GapAnalysisResult['contentCalendarSuggestions']> {
     if (gaps.length === 0) return [];
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const gapSummary = gaps.slice(0, 6).map(g => `Gap: ${g.gap} | Format: ${g.suggestedFormat} | Hook: ${g.suggestedHook}`).join('\n');
 
     try {

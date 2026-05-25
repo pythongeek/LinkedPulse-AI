@@ -67,7 +67,7 @@ export class TrendAnalyzer {
   ): Promise<TrendData> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 
@@ -129,7 +129,7 @@ Ensure all fields are fully populated and the response is strictly JSON.`;
   async getTrendingTopics(category: string = 'business', limit: number = 10): Promise<any[]> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 
@@ -172,7 +172,7 @@ Return strictly as a JSON array of objects:
   async compareTopics(topics: string[]): Promise<any> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 

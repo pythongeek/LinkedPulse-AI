@@ -359,7 +359,7 @@ export class ContentGenerationService {
   private async researchAgent(topic: string, depth: 'none' | 'quick' | 'deep'): Promise<any> {
     try {
       const modelConfig: any = { 
-        model: 'gemini-2.5-flash'
+        model: 'gemini-1.5-flash'
       };
       if (depth !== 'none') {
         modelConfig.tools = [{ googleSearch: {} } as any];
@@ -943,7 +943,7 @@ Return ONLY the first comment text, nothing else.`,
   private async visualAgent(topic: string, content: string, persona?: Persona | null): Promise<string[]> {
     try {
       const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         generationConfig: { responseMimeType: 'application/json' }
       });
 
