@@ -143,7 +143,7 @@ export function QuickGenerateDialog({ isOpen, onClose, topic, contentType = 'pos
                 </p>
               </div>
               <Button 
-                onClick={() => navigate('/history')}
+                onClick={() => navigate('/content/history')}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
               >
                 View in Content History <ArrowRight className="w-4 h-4 ml-2" />

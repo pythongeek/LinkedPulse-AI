@@ -8,6 +8,7 @@ interface GapIntelligenceBoardProps {
   gaps: any; // from API: { topGaps: [], saturatedAngles: [] }
   topic: string;
   audienceSegment?: string;
+  onGenerateNow?: (contentType: string, specificTopic?: string) => void;
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -32,13 +33,15 @@ export function GapIntelligenceBoard({
   gaps,
   topic,
   audienceSegment,
+  onGenerateNow,
 }: GapIntelligenceBoardProps) {
   const topGaps: any[] = gaps?.topGaps ?? [];
   const count = topGaps.length;
 
   function handleGenerate(gap: any) {
-    // Parent page handles navigation via GapCard's internal useNavigate
-    console.log('[GapIntelligenceBoard] generate gap:', gap.gap);
+    if (onGenerateNow) {
+      onGenerateNow(gap.suggestedFormat, `${topic}: ${gap.gap}`);
+    }
   }
 
   function handleSave(gap: any) {

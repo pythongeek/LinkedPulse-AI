@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   FileText,
   Layers,
@@ -192,7 +191,6 @@ function BriefSection({ gap }: { gap: GapCardProps['gap'] }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function GapCard({ gap, topic, audienceSegment, onGenerate, onSave }: GapCardProps) {
-  const navigate = useNavigate();
   const [briefOpen, setBriefOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -200,16 +198,7 @@ export function GapCard({ gap, topic, audienceSegment, onGenerate, onSave }: Gap
   const gapTitle = gap.gap?.replace(/\[.*?\]\s*/, '') || gap.gap;
 
   function handleGenerate() {
-    const params = new URLSearchParams({
-      topic: `${topic}: ${gap.gap}`,
-      contentType: gap.suggestedFormat,
-    });
-    if (gap.suggestedHookFormula) params.set('hookFormula', gap.suggestedHookFormula);
-    if (gap.openingHook) params.set('customInstructions', `Start with: "${gap.openingHook}"`);
-    if (audienceSegment) params.set('audienceSegment', audienceSegment);
-
     onGenerate(gap);
-    navigate(`/content/studio?${params.toString()}`);
   }
 
   function handleCopyHook() {

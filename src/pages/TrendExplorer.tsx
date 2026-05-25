@@ -200,8 +200,8 @@ export default function TrendExplorer() {
     analyzeMutation.mutate(cfg);
   };
 
-  const handleGenerateNow = (contentType: string) => {
-    const keyword = config?.keyword || analysisResult?.data?.meta?.keyword;
+  const handleGenerateNow = (contentType: string, specificTopic?: string) => {
+    const keyword = specificTopic || config?.keyword || analysisResult?.data?.meta?.keyword;
     if (keyword) {
       setGenerateTopic(keyword);
       setGenerateFormat(contentType);
@@ -524,6 +524,7 @@ export default function TrendExplorer() {
                     gaps={gaps}
                     topic={config?.keyword || ''}
                     audienceSegment={config?.audienceSegment}
+                    onGenerateNow={handleGenerateNow}
                   />
                 )}
 

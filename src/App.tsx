@@ -6,6 +6,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout';
+import AuthLayout from './layouts/AuthLayout';
 
 // Auth
 import ProtectedRoute from './components/ProtectedRoute';

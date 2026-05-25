@@ -34,11 +34,7 @@ export default function Login() {
     <Card className="w-full border-white/10 bg-black/40 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 pointer-events-none" />
       <CardHeader className="space-y-2 pb-6 relative z-10">
-        <div className="flex items-center justify-center mb-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.3)] border border-white/10">
-            <Linkedin className="h-7 w-7 text-white" />
-          </div>
-        </div>
+
         <CardTitle className="text-3xl text-center font-bold tracking-tight bg-gradient-to-br from-white to-white/70 bg-clip-text text-transparent">Welcome back</CardTitle>
         <CardDescription className="text-center text-slate-400">
           Sign in to your LinkedPulse AI account
