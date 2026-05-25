@@ -45,7 +45,7 @@ export class GapAnalysisEngine {
   ): Promise<ContentGap[]> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         tools: depth === 'deep' ? [{ googleSearch: {} } as any] : [],
       });
 
@@ -118,7 +118,7 @@ Return JSON array ONLY — no prose:
     if (gaps.length === 0) return [];
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 

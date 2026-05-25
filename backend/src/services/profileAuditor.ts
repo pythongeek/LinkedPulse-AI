@@ -97,7 +97,7 @@ export interface ProfileAuditResult {
 export class ProfileAuditor {
   private getModel(mimeType = 'application/json') {
     return genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       generationConfig: { responseMimeType: mimeType }
     });
   }
@@ -905,7 +905,7 @@ Return a JSON array of objects with exactly this structure:
    */
   async generateAbout(persona: string, achievements: string[], targetAudience: string): Promise<string> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const prompt = `Write a compelling LinkedIn About section:
 
 Persona: ${persona}

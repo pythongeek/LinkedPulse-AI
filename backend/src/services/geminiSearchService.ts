@@ -18,7 +18,7 @@ export class GeminiSearchService {
 
   private async executeSearch(prompt: string, maxResults: number): Promise<SearchResult[]> {
     const model = this.genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       tools: [{ googleSearch: {} } as any],
     });
 

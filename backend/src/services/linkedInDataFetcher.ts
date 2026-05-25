@@ -72,7 +72,7 @@ export class LinkedInDataFetcher {
   ): Promise<RealPostData[]> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 
@@ -131,7 +131,7 @@ Return a JSON array of exactly ${Math.min(limit, 15)} posts:
   async analyzeCreatorProfile(linkedinUrl: string): Promise<any> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 

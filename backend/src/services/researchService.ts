@@ -18,7 +18,7 @@ export class ResearchService {
   async webSearch(query: string, limit: number = 10): Promise<ResearchResult[]> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 
@@ -98,7 +98,7 @@ Return in JSON format:
    */
   async geminiSearch(query: string, limit: number = 10): Promise<ResearchResult[]> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
       const prompt = `Provide 10 relevant details or context about: "${query}"
 Include:
@@ -137,7 +137,7 @@ Return in JSON format:
   async newsSearch(query: string, limit: number = 10): Promise<ResearchResult[]> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 
@@ -199,7 +199,7 @@ Return in JSON format:
    */
   async extractFromUrl(url: string): Promise<any> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
       const prompt = `Extract key information from this URL: ${url}
 
@@ -233,7 +233,7 @@ Return in JSON format.`;
    */
   async summarizeFindings(results: ResearchResult[]): Promise<string> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
       const prompt = `Summarize these research findings into key insights:
 

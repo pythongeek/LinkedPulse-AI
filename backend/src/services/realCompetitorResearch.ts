@@ -36,7 +36,7 @@ export class RealCompetitorResearch {
   async collectSignals(topic: string, depth: 'quick' | 'deep'): Promise<RealPost[]> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 
@@ -106,7 +106,7 @@ Return JSON ONLY — no prose before or after:
   ): Promise<{ posts: RealPost[]; rawBenchmark: Partial<CompetitorBenchmark> }> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 
@@ -175,7 +175,7 @@ Return JSON ONLY:
   }> {
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         tools: [{ googleSearch: {} } as any],
       });
 

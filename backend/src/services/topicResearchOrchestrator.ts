@@ -231,7 +231,7 @@ export class TopicResearchOrchestrator {
 
   private async extractStatisticsFromSources(sources: any[], topic: string, contextPrompt = '') {
     if (sources.length === 0) return [];
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const sourceContent = sources.slice(0, 8).map(s => `SOURCE: ${s.title}\nURL: ${s.url}\nCONTENT: ${s.content}`).join('\n\n---\n\n');
 
     try {
@@ -256,7 +256,7 @@ If no statistics are found, return []`
 
   private async synthesizeExpertInsights(sources: any[], topic: string, contextPrompt = '') {
     if (sources.length === 0) return [];
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const topSources = sources.slice(0, 6).map(s => `${s.title} (${s.url}): ${s.content?.substring(0, 400)}`).join('\n\n');
 
     try {
@@ -278,7 +278,7 @@ Return JSON: [{"insight": "...", "source": "domain", "url": "exact source URL"}]
   }
 
   private async getLinkedInContext(topic: string, contextPrompt = '') {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', tools: [{ googleSearch: {} } as any] });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', tools: [{ googleSearch: {} } as any] });
     try {
       const result = await model.generateContent(
         `${contextPrompt ? contextPrompt + '\n\n' : ''}Search LinkedIn and professional content sites for the current content landscape around "${topic}":
