@@ -334,7 +334,7 @@ export default function ContentStudio() {
       <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-600/10 rounded-full blur-[120px] mix-blend-screen animate-[pulse_8s_ease-in-out_infinite]" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] bg-violet-600/10 rounded-full blur-[150px] mix-blend-screen animate-[pulse_10s_ease-in-out_infinite_reverse]" />
       <div className="absolute top-[40%] left-[20%] w-[30vw] h-[30vw] bg-blue-600/5 rounded-full blur-[100px] mix-blend-screen animate-[pulse_12s_ease-in-out_infinite]" />
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none mix-blend-overlay"></div>
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20viewBox=%220%200%20200%20200%22%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter%20id=%22noiseFilter%22%3E%3CfeTurbulence%20type=%22fractalNoise%22%20baseFrequency=%220.65%22%20numOctaves=%223%22%20stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect%20width=%22100%25%22%20height=%22100%25%22%20filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')] opacity-[0.03] pointer-events-none mix-blend-overlay"></div>
       
       <div className="relative space-y-10 max-w-[1400px] mx-auto px-6 sm:px-8 lg:px-12 py-12 z-10">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 border-b border-white/5 pb-8">
@@ -694,7 +694,7 @@ export default function ContentStudio() {
             <CardContent className="flex-1 flex flex-col p-6">
               {generatedContent && (
                 <div className="grid grid-cols-3 gap-4 bg-[#050505]/50 rounded-2xl border border-white/5 mb-6 text-center shadow-inner p-4 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.05] mix-blend-overlay pointer-events-none" />
+                  <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20viewBox=%220%200%20200%20200%22%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter%20id=%22noiseFilter%22%3E%3CfeTurbulence%20type=%22fractalNoise%22%20baseFrequency=%220.65%22%20numOctaves=%223%22%20stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect%20width=%22100%25%22%20height=%22100%25%22%20filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')] opacity-[0.05] mix-blend-overlay pointer-events-none" />
                   <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-white/[0.02] border border-white/5 shadow-[0_4px_24px_rgba(0,0,0,0.4)] hover:bg-white/[0.04] transition-colors relative z-10">
                     <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-3">Grounded Status</span>
                     <div className={cn("px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(0,0,0,0.5)] border", generatedContent.isAiGrounded ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_20px_rgba(52,211,153,0.15)]" : "bg-amber-500/10 text-amber-400 border-amber-500/20")}>

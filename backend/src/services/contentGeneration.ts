@@ -830,9 +830,11 @@ Return JSON:
         return draft;
       }
 
+      const contentTypeLabel = contentType === 'carousel' ? 'post caption (accompanying the slide deck)' : contentType;
+
       const result = await this.minimax.promptJSON(
         'You are a LinkedIn content editor specializing in maximum engagement.',
-        `Edit this LinkedIn ${contentType} for MAXIMUM engagement:
+        `Edit this LinkedIn ${contentTypeLabel} for MAXIMUM engagement:
 
 CONTENT: ${draftContent}
 
@@ -846,13 +848,19 @@ ${customPrompt}
 
 Return JSON:
 {
-  "content": "Edited content"
+  "content": "Edited content string (MUST be a plain text string, NOT a JSON object)"
 }
 
 STRICT RULE: Do NOT output any conversational text, greetings, or warnings. ONLY output the requested JSON object. If you encounter an error or missing data, still output valid JSON with your best attempt at editing.`
       );
 
-      return { ...draft, ...result, formattedContent: result.content };
+      let editedContent = result.content;
+      if (editedContent && typeof editedContent === 'object') {
+        logger.warn('[EditingAgent] result.content returned as object, extracting string');
+        editedContent = editedContent.content || editedContent.caption || editedContent.text || JSON.stringify(editedContent);
+      }
+
+      return { ...draft, content: editedContent, formattedContent: editedContent };
     } catch (error) {
       logger.error('Editing agent error:', error);
       return draft;
@@ -865,6 +873,10 @@ STRICT RULE: Do NOT output any conversational text, greetings, or warnings. ONLY
    */
   private async factCheckAgent(content: any, sources: any[]): Promise<any> {
     try {
+      const textToFactCheck = typeof content.content === 'object'
+        ? (content.content.content || content.content.caption || content.content.text || JSON.stringify(content.content))
+        : (content.content || '');
+
       const result = await this.minimax.promptJSON(
         `Your job is ONLY to verify or flag specific factual claims. You MUST preserve all personal narrative, opinion, and storytelling completely unchanged.
 
@@ -877,20 +889,26 @@ RULES:
 - Return the content as-is unless a concrete factual error exists.`,
         `Fact-check this content:
 
-${content.content}
+${textToFactCheck}
 
 SOURCES: ${JSON.stringify(sources?.slice(0, 5))}
 
 Return JSON:
 {
-  "content": "The content with only factual corrections (or exact original if no changes needed)",
+  "content": "The content with only factual corrections (or exact original if no changes needed) (MUST be a plain text string, NOT a JSON object)",
   "factsChecked": ["list of facts that were verified"],
   "modified": false
 }`,
         { temperature: 0.2 }
       );
 
-      return { ...content, ...result, sources, formattedContent: result.content };
+      let verifiedContent = result.content;
+      if (verifiedContent && typeof verifiedContent === 'object') {
+        logger.warn('[FactCheckAgent] result.content returned as object, extracting string');
+        verifiedContent = verifiedContent.content || verifiedContent.caption || verifiedContent.text || JSON.stringify(verifiedContent);
+      }
+
+      return { ...content, content: verifiedContent, formattedContent: verifiedContent, sources, factsChecked: result.factsChecked || [], modified: result.modified || false };
     } catch (error) {
       logger.error('Fact check agent error:', error);
       return { ...content, verified: false, sources, factsChecked: [], modified: false };

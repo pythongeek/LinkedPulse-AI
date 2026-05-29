@@ -313,6 +313,26 @@ export class LinkedInPublisher {
   }
 
   /**
+   * Cleans raw markdown markers that won't render properly on LinkedIn
+   */
+  static cleanMarkdownForLinkedIn(text: string): string {
+    if (!text) return '';
+    return text
+      // Replace markdown bold **text** or __text__ with text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      // Replace markdown italic *text* or _text_ with text
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      // Replace inline code `code` with code
+      .replace(/`([^`]+)`/g, '$1')
+      // Replace markdown headers (e.g. "# Header") with just the text
+      .replace(/^[ \t]*#{1,6}\s+([^\n]+)/gm, '$1')
+      // Replace blockquotes (e.g., "> Text") with just the text
+      .replace(/^[ \t]*>\s+([^\n]+)/gm, '$1');
+  }
+
+  /**
    * Format and publish a complete content record to LinkedIn
    */
   static async publishContentRecord(content: any, accessToken: string, logger: any): Promise<string> {
@@ -321,6 +341,8 @@ export class LinkedInPublisher {
     if (textToPublish === 'undefined') {
       textToPublish = '';
     }
+
+    textToPublish = this.cleanMarkdownForLinkedIn(textToPublish);
 
     // Format poll
     if (content.contentType === 'poll' && content.pollQuestion) {
@@ -406,7 +428,8 @@ export class LinkedInPublisher {
 
     if (content.firstComment) {
       try {
-        await this.publishComment(postUrn, content.firstComment, accessToken);
+        const commentText = this.cleanMarkdownForLinkedIn(content.firstComment);
+        await this.publishComment(postUrn, commentText, accessToken);
         logger.info(`Strategic first comment published automatically for post: ${postUrn}`);
       } catch (commentError) {
         logger.error(`Failed to publish automatic first comment for ${postUrn}:`, commentError);

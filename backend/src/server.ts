@@ -58,6 +58,12 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    const path = req.originalUrl || req.path;
+    return path.includes('/api/cron/status') || 
+           path.includes('/api/cron/advance') || 
+           path.includes('/api/health');
+  }
 });
 app.use(limiter);
 
