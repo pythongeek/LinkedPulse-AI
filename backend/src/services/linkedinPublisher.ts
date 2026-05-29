@@ -208,40 +208,34 @@ export class LinkedInPublisher {
   }
 
   /**
-   * Register a document upload with LinkedIn Assets API
+   * Register a document upload with LinkedIn Documents API
    */
   static async registerDocumentUpload(accessToken: string, authorUrn?: string): Promise<{ uploadUrl: string; assetUrn: string }> {
     try {
       const urn = authorUrn || await this.getAuthorUrn(accessToken);
 
       const payload = {
-        registerUploadRequest: {
-          recipes: ['urn:li:digitalmediaRecipe:feedshare-document'],
+        initializeUploadRequest: {
           owner: urn,
-          serviceRelationships: [
-            {
-              relationshipType: 'OWNER',
-              identifier: 'urn:li:userGeneratedContent',
-            },
-          ],
         },
       };
 
-      const response = await axios.post('https://api.linkedin.com/v2/assets?action=registerUpload', payload, {
+      const response = await axios.post('https://api.linkedin.com/rest/documents?action=initializeUpload', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          'LinkedIn-Version': '202401',
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
       });
 
-      const uploadUrl = response.data.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
-      const assetUrn = response.data.value.asset;
+      const uploadUrl = response.data.value.uploadUrl;
+      const assetUrn = response.data.value.document;
 
       return { uploadUrl, assetUrn };
     } catch (error: any) {
       logger.error('Failed to register LinkedIn document upload', error.response?.data || error.message);
-      throw new Error(`LinkedIn Assets API Error: ${error.response?.data?.message || error.message}`);
+      throw new Error(`LinkedIn Documents API Error: ${error.response?.data?.message || error.message}`);
     }
   }
 
@@ -253,7 +247,7 @@ export class LinkedInPublisher {
       await axios.put(uploadUrl, documentBuffer, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/octet-stream',
+          'Content-Type': 'application/pdf',
         },
       });
     } catch (error: any) {
@@ -263,52 +257,76 @@ export class LinkedInPublisher {
   }
 
   /**
-   * Publish a document post via UGC API
+   * Publish a document post via LinkedIn Posts API
    */
   static async publishDocument(text: string, assetUrn: string, documentTitle: string, accessToken: string, authorUrn?: string): Promise<string> {
     try {
       const urn = authorUrn || await this.getAuthorUrn(accessToken);
 
+      // Poll document status until AVAILABLE
+      let status = '';
+      let attempts = 0;
+      const maxAttempts = 15;
+      while (status !== 'AVAILABLE' && attempts < maxAttempts) {
+        // Wait 2 seconds between status checks
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+          const statusResponse = await axios.get(`https://api.linkedin.com/rest/documents/${encodeURIComponent(assetUrn)}`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'LinkedIn-Version': '202401',
+              'X-Restli-Protocol-Version': '2.0.0',
+            }
+          });
+          status = statusResponse.data.status;
+          logger.info(`Polling LinkedIn document status: ${status} (attempt ${attempts + 1}/${maxAttempts})`);
+          if (status === 'PROCESSING_FAILED') {
+            throw new Error('LinkedIn document processing failed');
+          }
+        } catch (pollError: any) {
+          logger.error('Error polling LinkedIn document status', pollError.response?.data || pollError.message);
+        }
+        attempts++;
+      }
+
+      if (status !== 'AVAILABLE') {
+        throw new Error('LinkedIn document processing timed out or failed to become AVAILABLE');
+      }
+
       const payload = {
         author: urn,
-        lifecycleState: 'PUBLISHED',
-        specificContent: {
-          'com.linkedin.ugc.ShareContent': {
-            shareCommentary: {
-              text: text,
-            },
-            shareMediaCategory: 'DOCUMENT',
-            media: [
-              {
-                status: 'READY',
-                description: {
-                  text: documentTitle,
-                },
-                media: assetUrn,
-                title: {
-                  text: documentTitle,
-                }
-              },
-            ],
-          },
+        commentary: text,
+        visibility: 'PUBLIC',
+        distribution: {
+          feedDistribution: 'MAIN_FEED'
         },
-        visibility: {
-          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+        content: {
+          media: {
+            id: assetUrn,
+            title: documentTitle
+          }
         },
+        lifecycleState: 'PUBLISHED'
       };
 
-      const response = await axios.post('https://api.linkedin.com/v2/ugcPosts', payload, {
+      const response = await axios.post('https://api.linkedin.com/rest/posts', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          'LinkedIn-Version': '202401',
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
       });
 
-      return response.data.id;
+      const postId = response.headers['x-restli-id'];
+      if (!postId) {
+        logger.warn('LinkedIn posts API did not return x-restli-id header, attempting response data fallback');
+        return response.data?.id || '';
+      }
+      return postId;
     } catch (error: any) {
       logger.error('Failed to publish document post to LinkedIn', error.response?.data || error.message);
-      throw new Error(`LinkedIn API Error: ${error.response?.data?.message || error.message}`);
+      throw new Error(`LinkedIn Posts API Error: ${error.response?.data?.message || error.message}`);
     }
   }
 
