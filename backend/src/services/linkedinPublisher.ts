@@ -393,19 +393,10 @@ export class LinkedInPublisher {
           await this.uploadDocumentBinary(uploadUrl, pdfBuffer, accessToken);
           
           postUrn = await this.publishDocument(textToPublish, assetUrn, content.title || 'Document Content Deck', accessToken);
-        } catch (pdfError) {
-          logger.error('Failed to generate or upload PDF carousel, falling back to text post', pdfError);
-          // Fallback to text formatting
-          const slidesText = slidesList
-            .sort((a: any, b: any) => (a.slideNumber || 0) - (b.slideNumber || 0))
-            .map((slide: any) => {
-              const slideHeader = `Slide ${slide.slideNumber}: ${slide.headline}`;
-              const slideBody = slide.body ? `\n   ${slide.body}` : '';
-              return `${slideHeader}${slideBody}`;
-            })
-            .join('\n\n');
-          const prefix = textToPublish.trim() ? `${textToPublish}\n\n` : '';
-          textToPublish = `${prefix}📖 CAROUSEL SLIDES OUTLINE:\n\n${slidesText}`;
+        } catch (pdfError: any) {
+          logger.error('Failed to generate or upload PDF carousel', pdfError);
+          const errMsg = pdfError.response?.data?.message || pdfError.response?.data?.error?.message || pdfError.message;
+          throw new Error(`LinkedIn Carousel Upload Failed: ${errMsg}`);
         }
       }
     }
