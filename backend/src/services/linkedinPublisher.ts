@@ -247,7 +247,6 @@ export class LinkedInPublisher {
     try {
       await axios.put(uploadUrl, documentBuffer, {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/pdf',
         },
       });
