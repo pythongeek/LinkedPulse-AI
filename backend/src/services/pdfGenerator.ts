@@ -1,5 +1,6 @@
 import PDFDocument = require('pdfkit');
 import { logger } from '../utils/logger';
+import path = require('path');
 
 export interface SlideData {
   slideNumber: number;
@@ -25,6 +26,26 @@ export class PdfGeneratorService {
             Creator: 'LinkedPulse AI'
           }
         });
+
+        // Register custom fonts to avoid Vercel serverless built-in AFM font loading issues
+        let regularFont = 'Helvetica';
+        let boldFont = 'Helvetica-Bold';
+
+        try {
+          let fontDir = path.join(process.cwd(), 'backend', 'src', 'assets', 'fonts');
+          if (process.cwd().endsWith('backend')) {
+            fontDir = path.join(process.cwd(), 'src', 'assets', 'fonts');
+          }
+          const regularFontPath = path.join(fontDir, 'Arial.ttf');
+          const boldFontPath = path.join(fontDir, 'Arial-Bold.ttf');
+
+          doc.registerFont('Arial', regularFontPath);
+          doc.registerFont('Arial-Bold', boldFontPath);
+          regularFont = 'Arial';
+          boldFont = 'Arial-Bold';
+        } catch (fontErr) {
+          logger.error('Failed to register custom fonts, falling back to standard Helvetica', fontErr);
+        }
 
         const buffers: Buffer[] = [];
         doc.on('data', buffers.push.bind(buffers));
@@ -64,7 +85,7 @@ export class PdfGeneratorService {
           
           doc.fontSize(48)
              .fillColor('#0F172A')
-             .font('Helvetica-Bold')
+             .font(boldFont)
              .text(slide.headline || '', {
                align: 'center',
                width: 700
@@ -75,7 +96,7 @@ export class PdfGeneratorService {
             doc.moveDown(1.5);
             doc.fontSize(28)
                .fillColor('#334155')
-               .font('Helvetica')
+               .font(regularFont)
                .text(slide.body, {
                  align: 'center',
                  width: 700,
