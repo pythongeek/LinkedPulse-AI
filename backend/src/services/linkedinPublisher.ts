@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
+import { PdfGeneratorService } from './pdfGenerator';
 
 export class LinkedInPublisher {
   /**
@@ -387,7 +388,6 @@ export class LinkedInPublisher {
       const slidesList = content.slides as any;
       if (Array.isArray(slidesList) && slidesList.length > 0) {
         try {
-          const { PdfGeneratorService } = await import('./pdfGenerator.js');
           const pdfBuffer = await PdfGeneratorService.generateCarouselPdf(slidesList, content.title || 'Carousel');
           
           const { uploadUrl, assetUrn } = await this.registerDocumentUpload(accessToken);
@@ -427,7 +427,6 @@ export class LinkedInPublisher {
             const base64Data = imageUrlOrBase64.split(',')[1];
             imageBuffer = Buffer.from(base64Data, 'base64');
           } else {
-            const axios = (await import('axios')).default;
             const imageRes = await axios.get(imageUrlOrBase64, { responseType: 'arraybuffer' });
             imageBuffer = Buffer.from(imageRes.data);
           }
