@@ -59,10 +59,12 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    const path = req.originalUrl || req.path;
-    return path.includes('/api/cron/status') || 
-           path.includes('/api/cron/advance') || 
-           path.includes('/api/health');
+    const path = (req.originalUrl || req.path || '').toLowerCase();
+    return path.includes('/status') || 
+           path.includes('/advance') || 
+           path.includes('/tick') || 
+           path.includes('/analyze') || 
+           path.includes('/health');
   }
 });
 app.use(limiter);
