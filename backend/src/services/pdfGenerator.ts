@@ -169,6 +169,19 @@ export class PdfGeneratorService {
        });
   }
 
+  private static formatBodyText(text: string): string {
+    if (!text) return '';
+    return text.split('\n').map(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+        return `•  ${trimmed.substring(2)}`;
+      } else if (trimmed.startsWith('*') || trimmed.startsWith('-')) {
+        return `•  ${trimmed.substring(1)}`;
+      }
+      return line;
+    }).join('\n');
+  }
+
   private static drawContentSlide(
     doc: PDFKit.PDFDocument,
     slide: SlideData,
@@ -186,15 +199,18 @@ export class PdfGeneratorService {
          lineGap: 10
        });
 
-    // Accent line
-    doc.rect(100, doc.y + 15, 100, 6).fill(theme.primaryColor);
+    const currentY = doc.y;
+
+    // Accent line below title
+    doc.rect(100, currentY + 20, 120, 8).fill(theme.primaryColor);
 
     // Body
     if (slide.body) {
+      const formattedBody = this.formatBodyText(slide.body);
       doc.fontSize(36)
          .fillColor(theme.textColor)
          .font(regularFont)
-         .text(slide.body, 100, 280, {
+         .text(formattedBody, 100, currentY + 60, {
            width: 880,
            align: 'left',
            lineGap: 14
@@ -216,11 +232,13 @@ export class PdfGeneratorService {
        .font(boldFont)
        .text('“', 100, 80, { lineGap: 0 });
 
+    const quoteY = doc.y;
+
     // Quote text (using headline)
     doc.fontSize(44)
        .fillColor(theme.textColor)
        .font(italicFont)
-       .text(slide.headline || '', 120, 240, {
+       .text(slide.headline || '', 120, quoteY + 20, {
          width: 840,
          align: 'left',
          lineGap: 16
@@ -258,15 +276,18 @@ export class PdfGeneratorService {
          lineGap: 15
        });
 
+    const ctaY = doc.y;
+
     // Divider inside card
-    doc.rect(490, doc.y + 40, 100, 4).fill('#FFFFFF');
+    doc.rect(490, ctaY + 30, 100, 4).fill('#FFFFFF');
 
     // Body inside card
     if (slide.body) {
+      const formattedBody = this.formatBodyText(slide.body);
       doc.fontSize(38)
          .fillColor('#FFFFFF')
          .font(regularFont)
-         .text(slide.body, 150, doc.y + 40, {
+         .text(formattedBody, 150, ctaY + 70, {
            width: 780,
            align: 'center',
            lineGap: 12
