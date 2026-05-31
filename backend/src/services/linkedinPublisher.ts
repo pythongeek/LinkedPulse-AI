@@ -224,7 +224,7 @@ export class LinkedInPublisher {
       const response = await axios.post('https://api.linkedin.com/rest/documents?action=initializeUpload', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202401',
+          'LinkedIn-Version': '202605',
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
@@ -274,7 +274,7 @@ export class LinkedInPublisher {
           const statusResponse = await axios.get(`https://api.linkedin.com/rest/documents/${encodeURIComponent(assetUrn)}`, {
             headers: {
               Authorization: `Bearer ${accessToken}`,
-              'LinkedIn-Version': '202401',
+              'LinkedIn-Version': '202605',
               'X-Restli-Protocol-Version': '2.0.0',
             }
           });
@@ -312,7 +312,7 @@ export class LinkedInPublisher {
       const response = await axios.post('https://api.linkedin.com/rest/posts', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202401',
+          'LinkedIn-Version': '202605',
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
