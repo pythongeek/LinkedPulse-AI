@@ -387,7 +387,31 @@ export class LinkedInPublisher {
       const slidesList = content.slides as any;
       if (Array.isArray(slidesList) && slidesList.length > 0) {
         try {
-          const pdfBuffer = await PdfGeneratorService.generateCarouselPdf(slidesList, content.title || 'Carousel');
+          const defaultTheme = {
+            primaryColor: '#0284C7',
+            backgroundColor: '#F8FAFC',
+            textColor: '#0F172A',
+            accentColor: '#64748B',
+            authorName: 'LinkedPulse AI',
+            authorHandle: '@linkedpulse'
+          };
+          
+          let theme = defaultTheme;
+          if (content.linkedinOptimization && typeof content.linkedinOptimization === 'object') {
+            const opt = content.linkedinOptimization as any;
+            if (opt.theme) {
+              theme = {
+                primaryColor: opt.theme.primaryColor || defaultTheme.primaryColor,
+                backgroundColor: opt.theme.backgroundColor || defaultTheme.backgroundColor,
+                textColor: opt.theme.textColor || defaultTheme.textColor,
+                accentColor: opt.theme.accentColor || defaultTheme.accentColor,
+                authorName: opt.theme.authorName || defaultTheme.authorName,
+                authorHandle: opt.theme.authorHandle || defaultTheme.authorHandle,
+              };
+            }
+          }
+
+          const pdfBuffer = await PdfGeneratorService.generateCarouselPdf(slidesList, theme, content.title || 'Carousel');
           
           const { uploadUrl, assetUrn } = await this.registerDocumentUpload(accessToken);
           await this.uploadDocumentBinary(uploadUrl, pdfBuffer, accessToken);

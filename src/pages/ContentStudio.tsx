@@ -73,6 +73,15 @@ export default function ContentStudio() {
   const [includeFirstComment, setIncludeFirstComment] = useState(true);
   const [toneOverride, setToneOverride] = useState('');
   const [audienceExpertiseLevel, setAudienceExpertiseLevel] = useState('intermediate');
+  const [isSaving, setIsSaving] = useState(false);
+  const [carouselTheme, setCarouselTheme] = useState({
+    primaryColor: '#0284C7',
+    backgroundColor: '#F8FAFC',
+    textColor: '#0F172A',
+    accentColor: '#64748B',
+    authorName: 'LinkedPulse AI',
+    authorHandle: '@linkedpulse'
+  });
 
   const config = CONTENT_TYPE_CONFIGS[contentType];
   const [customInstructions, setCustomInstructions] = useState(config?.defaultPrompt || '');
@@ -196,6 +205,32 @@ export default function ContentStudio() {
     });
   };
 
+  const handleSaveChanges = async (silent = false) => {
+    if (!generatedContent?.id) return;
+    if (!silent) setIsSaving(true);
+    try {
+      const currentTheme = generatedContent.linkedinOptimization?.theme || carouselTheme;
+      const updatedOptimization = {
+        ...(generatedContent.linkedinOptimization || {}),
+        theme: currentTheme
+      };
+
+      await contentApi.update(generatedContent.id, {
+        title: generatedContent.title || '',
+        body: generatedContent.body || '',
+        slides: generatedContent.slides || undefined,
+        firstComment: generatedContent.firstComment || undefined,
+        linkedinOptimization: updatedOptimization
+      });
+      if (!silent) toast.success('Changes saved successfully!');
+    } catch (error: any) {
+      if (!silent) toast.error(error.response?.data?.error?.message || 'Failed to save changes');
+      throw error;
+    } finally {
+      if (!silent) setIsSaving(false);
+    }
+  };
+
   const handlePublish = async () => {
     if (!generatedContent?.id) {
       toast.error('No content ID found to publish');
@@ -204,6 +239,7 @@ export default function ContentStudio() {
     
     setIsPublishing(true);
     try {
+      await handleSaveChanges(true);
       await contentApi.publish(generatedContent.id);
       toast.success('Successfully published to LinkedIn!');
       setGeneratedContent({ ...generatedContent, status: 'published', publishedAt: new Date().toISOString() });
@@ -226,13 +262,29 @@ export default function ContentStudio() {
       const scheduledFor = new Date(scheduleDate);
       scheduledFor.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
 
+      const currentTheme = generatedContent.linkedinOptimization?.theme || carouselTheme;
+      const updatedOptimization = {
+        ...(generatedContent.linkedinOptimization || {}),
+        theme: currentTheme
+      };
+
       await contentApi.update(generatedContent.id, {
         status: 'scheduled',
-        scheduledFor: scheduledFor.toISOString()
+        scheduledFor: scheduledFor.toISOString(),
+        title: generatedContent.title || '',
+        body: generatedContent.body || '',
+        slides: generatedContent.slides || undefined,
+        firstComment: generatedContent.firstComment || undefined,
+        linkedinOptimization: updatedOptimization
       });
       
       toast.success('Successfully scheduled post!');
-      setGeneratedContent({ ...generatedContent, status: 'scheduled', scheduledFor: scheduledFor.toISOString() });
+      setGeneratedContent({ 
+        ...generatedContent, 
+        status: 'scheduled', 
+        scheduledFor: scheduledFor.toISOString(),
+        linkedinOptimization: updatedOptimization
+      });
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || 'Failed to schedule post');
     } finally {
@@ -550,6 +602,24 @@ export default function ContentStudio() {
                     onSlideCountChange={setSlideCount}
                     ctaType={ctaType}
                     onCtaTypeChange={setCtaType}
+                    theme={
+                      generatedContent 
+                        ? (generatedContent.linkedinOptimization?.theme || carouselTheme)
+                        : carouselTheme
+                    }
+                    onThemeChange={(updatedTheme) => {
+                      setCarouselTheme(updatedTheme);
+                      if (generatedContent) {
+                        const opt = generatedContent.linkedinOptimization || {};
+                        setGeneratedContent({
+                          ...generatedContent,
+                          linkedinOptimization: {
+                            ...opt,
+                            theme: updatedTheme
+                          }
+                        });
+                      }
+                    }}
                   />
                 )}
 
@@ -779,6 +849,15 @@ export default function ContentStudio() {
                             <Copy className="w-4 h-4" />
                             Copy Clean Content
                           </Button>
+                          <Button 
+                            variant="outline" 
+                            className="flex-1 h-10 gap-1.5 bg-card border-border hover:bg-accent/40 text-foreground" 
+                            onClick={() => handleSaveChanges(false)}
+                            disabled={isSaving || generatedContent.status === 'published'}
+                          >
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
+                            Save Changes
+                          </Button>
                           {!linkedinStatus?.hasOAuth ? (
                             <div className="flex-1 flex flex-col gap-1">
                               <Button 
@@ -862,6 +941,9 @@ export default function ContentStudio() {
                       slides={generatedContent.slides || []}
                       onSlidesChange={(updated) =>
                         setGeneratedContent({ ...generatedContent, slides: updated })
+                      }
+                      theme={
+                        generatedContent.linkedinOptimization?.theme || carouselTheme
                       }
                     />
                   </TabsContent>

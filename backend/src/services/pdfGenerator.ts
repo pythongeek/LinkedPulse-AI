@@ -4,25 +4,64 @@ import path = require('path');
 
 export interface SlideData {
   slideNumber: number;
-  type?: string;
+  type?: 'cover' | 'content' | 'quote' | 'cta' | string;
   headline: string;
   body?: string;
+}
+
+export interface CarouselTheme {
+  primaryColor: string;
+  backgroundColor: string;
+  textColor: string;
+  accentColor: string;
+  authorName: string;
+  authorHandle: string;
 }
 
 export class PdfGeneratorService {
   /**
    * Generates a PDF buffer from an array of slides
    */
-  static async generateCarouselPdf(slides: SlideData[], title?: string): Promise<Buffer> {
+  static async generateCarouselPdf(
+    slides: SlideData[],
+    themeOrTitle?: CarouselTheme | string,
+    title?: string
+  ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       try {
-        // Create a document with slide-like dimensions (e.g., 1080x1080 equivalent in PDF points or standard presentation size)
-        // Let's use a standard 4:3 presentation size (e.g., 800 x 600) or square (800 x 800) for LinkedIn carousels
+        let activeTheme: CarouselTheme = {
+          primaryColor: '#0284C7',
+          backgroundColor: '#F8FAFC',
+          textColor: '#0F172A',
+          accentColor: '#64748B',
+          authorName: 'LinkedPulse AI',
+          authorHandle: '@linkedpulse'
+        };
+
+        let activeTitle = '';
+
+        if (themeOrTitle) {
+          if (typeof themeOrTitle === 'string') {
+            activeTitle = themeOrTitle;
+          } else {
+            activeTheme = {
+              primaryColor: themeOrTitle.primaryColor || activeTheme.primaryColor,
+              backgroundColor: themeOrTitle.backgroundColor || activeTheme.backgroundColor,
+              textColor: themeOrTitle.textColor || activeTheme.textColor,
+              accentColor: themeOrTitle.accentColor || activeTheme.accentColor,
+              authorName: themeOrTitle.authorName || activeTheme.authorName,
+              authorHandle: themeOrTitle.authorHandle || activeTheme.authorHandle,
+            };
+            if (title) activeTitle = title;
+          }
+        }
+
+        // Create a document with 1080x1080 slide dimensions for LinkedIn
         const doc = new PDFDocument({
-          size: [800, 800],
-          margin: 50,
+          size: [1080, 1080],
+          margin: 0,
           info: {
-            Title: title || 'LinkedIn Carousel',
+            Title: activeTitle || 'LinkedIn Carousel',
             Creator: 'LinkedPulse AI'
           }
         });
@@ -30,6 +69,7 @@ export class PdfGeneratorService {
         // Register custom fonts to avoid Vercel serverless built-in AFM font loading issues
         let regularFont = 'Helvetica';
         let boldFont = 'Helvetica-Bold';
+        let italicFont = 'Helvetica-Oblique';
 
         try {
           let fontDir = path.join(process.cwd(), 'backend', 'src', 'assets', 'fonts');
@@ -38,11 +78,14 @@ export class PdfGeneratorService {
           }
           const regularFontPath = path.join(fontDir, 'Arial.ttf');
           const boldFontPath = path.join(fontDir, 'Arial-Bold.ttf');
+          const italicFontPath = path.join(fontDir, 'Arial-Italic.ttf');
 
-          doc.registerFont('Arial', regularFontPath);
-          doc.registerFont('Arial-Bold', boldFontPath);
-          regularFont = 'Arial';
-          boldFont = 'Arial-Bold';
+          doc.registerFont('CustomFont', regularFontPath);
+          doc.registerFont('CustomFont-Bold', boldFontPath);
+          doc.registerFont('CustomFont-Italic', italicFontPath);
+          regularFont = 'CustomFont';
+          boldFont = 'CustomFont-Bold';
+          italicFont = 'CustomFont-Italic';
         } catch (fontErr) {
           logger.error('Failed to register custom fonts, falling back to standard Helvetica', fontErr);
         }
@@ -67,56 +110,33 @@ export class PdfGeneratorService {
             doc.addPage();
           }
 
-          // Background (Light grayish blue for professional look)
-          doc.rect(0, 0, 800, 800).fill('#F8FAFC');
+          // 1. Draw Global Background
+          doc.rect(0, 0, 1080, 1080).fill(activeTheme.backgroundColor);
 
-          // Add a subtle top accent bar
-          doc.rect(0, 0, 800, 20).fill('#0284C7');
+          // 2. Draw Global Footer
+          this.drawFooter(doc, slide, index + 1, sortedSlides.length, activeTheme, regularFont, boldFont);
 
-          // Slide type badge if it's special (like cover or cta)
-          if (slide.type && ['cover', 'cta'].includes(slide.type.toLowerCase())) {
-            doc.fontSize(16)
-               .fillColor('#0284C7')
-               .text(slide.type.toUpperCase(), 50, 60, { align: 'right' });
+          // 3. Render Specific Slide Layouts
+          const slideType = slide.type ? slide.type.toLowerCase() : 'content';
+          switch (slideType) {
+            case 'cover':
+              this.drawCoverSlide(doc, slide, activeTheme, regularFont, boldFont);
+              break;
+            case 'quote':
+              this.drawQuoteSlide(doc, slide, activeTheme, regularFont, boldFont, italicFont);
+              break;
+            case 'cta':
+              this.drawCtaSlide(doc, slide, activeTheme, regularFont, boldFont);
+              break;
+            default:
+              this.drawContentSlide(doc, slide, activeTheme, regularFont, boldFont);
           }
-
-          // Move down and draw Headline
-          doc.moveDown(3);
-          
-          doc.fontSize(48)
-             .fillColor('#0F172A')
-             .font(boldFont)
-             .text(slide.headline || '', {
-               align: 'center',
-               width: 700
-             });
-
-          // Move down and draw Body
-          if (slide.body) {
-            doc.moveDown(1.5);
-            doc.fontSize(28)
-               .fillColor('#334155')
-               .font(regularFont)
-               .text(slide.body, {
-                 align: 'center',
-                 width: 700,
-                 lineGap: 10
-               });
-          }
-          
-          // Add a footer with slide number
-          const footerText = `${index + 1} / ${sortedSlides.length}`;
-          
-          // Draw footer text at the bottom
-          doc.fontSize(16)
-             .fillColor('#94A3B8')
-             .text(footerText, 50, 750, { align: 'center' });
         });
 
         // Ensure there is at least one page if slides are empty
         if (sortedSlides.length === 0) {
-          doc.rect(0, 0, 800, 800).fill('#F8FAFC');
-          doc.fontSize(40).fillColor('#0F172A').text('No slides generated', 50, 350, { align: 'center' });
+          doc.rect(0, 0, 1080, 1080).fill(activeTheme.backgroundColor);
+          doc.fontSize(40).fillColor(activeTheme.textColor).font(boldFont).text('No slides generated', 100, 450, { align: 'center' });
         }
 
         // Finalize the PDF and end the stream
@@ -126,5 +146,160 @@ export class PdfGeneratorService {
         reject(error);
       }
     });
+  }
+
+  private static drawCoverSlide(
+    doc: PDFKit.PDFDocument,
+    slide: SlideData,
+    theme: CarouselTheme,
+    regularFont: string,
+    boldFont: string
+  ) {
+    // Large accent block on left
+    doc.rect(100, 250, 150, 15).fill(theme.primaryColor);
+
+    // Title text
+    doc.fontSize(75)
+       .fillColor(theme.textColor)
+       .font(boldFont)
+       .text(slide.headline || '', 100, 320, {
+         width: 880,
+         align: 'left',
+         lineGap: 20
+       });
+  }
+
+  private static drawContentSlide(
+    doc: PDFKit.PDFDocument,
+    slide: SlideData,
+    theme: CarouselTheme,
+    regularFont: string,
+    boldFont: string
+  ) {
+    // Title
+    doc.fontSize(52)
+       .fillColor(theme.textColor)
+       .font(boldFont)
+       .text(slide.headline || '', 100, 150, {
+         width: 880,
+         align: 'left',
+         lineGap: 10
+       });
+
+    // Accent line
+    doc.rect(100, doc.y + 15, 100, 6).fill(theme.primaryColor);
+
+    // Body
+    if (slide.body) {
+      doc.fontSize(36)
+         .fillColor(theme.textColor)
+         .font(regularFont)
+         .text(slide.body, 100, 280, {
+           width: 880,
+           align: 'left',
+           lineGap: 14
+         });
+    }
+  }
+
+  private static drawQuoteSlide(
+    doc: PDFKit.PDFDocument,
+    slide: SlideData,
+    theme: CarouselTheme,
+    regularFont: string,
+    boldFont: string,
+    italicFont: string
+  ) {
+    // Large Quotation Mark
+    doc.fontSize(180)
+       .fillColor(theme.primaryColor)
+       .font(boldFont)
+       .text('“', 100, 80, { lineGap: 0 });
+
+    // Quote text (using headline)
+    doc.fontSize(44)
+       .fillColor(theme.textColor)
+       .font(italicFont)
+       .text(slide.headline || '', 120, 240, {
+         width: 840,
+         align: 'left',
+         lineGap: 16
+       });
+
+    // Quote Author (using body)
+    if (slide.body) {
+      doc.fontSize(32)
+         .fillColor(theme.accentColor)
+         .font(boldFont)
+         .text(`— ${slide.body}`, 120, doc.y + 35, {
+           width: 840,
+           align: 'left'
+         });
+    }
+  }
+
+  private static drawCtaSlide(
+    doc: PDFKit.PDFDocument,
+    slide: SlideData,
+    theme: CarouselTheme,
+    regularFont: string,
+    boldFont: string
+  ) {
+    // Center Card background using primary color
+    doc.roundedRect(100, 200, 880, 620, 24).fill(theme.primaryColor);
+
+    // Title inside card
+    doc.fontSize(58)
+       .fillColor('#FFFFFF')
+       .font(boldFont)
+       .text(slide.headline || '', 150, 280, {
+         width: 780,
+         align: 'center',
+         lineGap: 15
+       });
+
+    // Divider inside card
+    doc.rect(490, doc.y + 40, 100, 4).fill('#FFFFFF');
+
+    // Body inside card
+    if (slide.body) {
+      doc.fontSize(38)
+         .fillColor('#FFFFFF')
+         .font(regularFont)
+         .text(slide.body, 150, doc.y + 40, {
+           width: 780,
+           align: 'center',
+           lineGap: 12
+         });
+    }
+  }
+
+  private static drawFooter(
+    doc: PDFKit.PDFDocument,
+    slide: SlideData,
+    current: number,
+    total: number,
+    theme: CarouselTheme,
+    regularFont: string,
+    boldFont: string
+  ) {
+    // Suppress footer on cover
+    if (slide.type === 'cover') return;
+
+    // Small footer separator line
+    doc.rect(100, 940, 880, 2).fill(theme.accentColor);
+
+    // Author Name & Handle (left-aligned)
+    doc.fontSize(22)
+       .fillColor(theme.accentColor)
+       .font(boldFont)
+       .text(theme.authorHandle, 100, 965, { align: 'left' });
+
+    // Page count (right-aligned)
+    const pageText = `${current.toString().padStart(2, '0')} / ${total.toString().padStart(2, '0')}`;
+    doc.fontSize(22)
+       .fillColor(theme.accentColor)
+       .font(regularFont)
+       .text(pageText, 880, 965, { align: 'right' });
   }
 }

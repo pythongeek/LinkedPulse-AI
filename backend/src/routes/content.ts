@@ -185,7 +185,7 @@ router.get('/:id', authenticate, async (req, res) => {
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const id = req.params.id as string;
-    const { title, body, status, scheduledFor } = req.body;
+    const { title, body, status, scheduledFor, slides, firstComment, linkedinOptimization } = req.body;
 
     // Check if content exists and belongs to user
     const existingContent = await prisma.content.findFirst({
@@ -209,6 +209,9 @@ router.put('/:id', authenticate, async (req, res) => {
         ...(status && { status }),
         ...(scheduledFor && { scheduledFor: new Date(scheduledFor) }),
         ...(status === 'published' && { publishedAt: new Date() }),
+        ...(slides !== undefined && { slides: slides as any }),
+        ...(firstComment !== undefined && { firstComment }),
+        ...(linkedinOptimization !== undefined && { linkedinOptimization: linkedinOptimization as any }),
       },
     });
 
