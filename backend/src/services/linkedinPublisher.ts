@@ -353,7 +353,7 @@ export class LinkedInPublisher {
   /**
    * Format and publish a complete content record to LinkedIn
    */
-  static async publishContentRecord(content: any, accessToken: string, logger: any): Promise<string> {
+  static async publishContentRecord(content: any, accessToken: string, logger: any, authorUrn?: string): Promise<string> {
     // Determine the text to publish
     let textToPublish = content.body || content.content || '';
     if (textToPublish === 'undefined') {
@@ -413,10 +413,10 @@ export class LinkedInPublisher {
 
           const pdfBuffer = await PdfGeneratorService.generateCarouselPdf(slidesList, theme, content.title || 'Carousel');
           
-          const { uploadUrl, assetUrn } = await this.registerDocumentUpload(accessToken);
+          const { uploadUrl, assetUrn } = await this.registerDocumentUpload(accessToken, authorUrn);
           await this.uploadDocumentBinary(uploadUrl, pdfBuffer, accessToken);
           
-          postUrn = await this.publishDocument(textToPublish, assetUrn, content.title || 'Document Content Deck', accessToken);
+          postUrn = await this.publishDocument(textToPublish, assetUrn, content.title || 'Document Content Deck', accessToken, authorUrn);
         } catch (pdfError: any) {
           logger.error('Failed to generate or upload PDF carousel', pdfError);
           const errMsg = pdfError.response?.data?.message || pdfError.response?.data?.error?.message || pdfError.message;
@@ -445,22 +445,22 @@ export class LinkedInPublisher {
             imageBuffer = Buffer.from(imageRes.data);
           }
 
-          const { uploadUrl, assetUrn } = await this.registerImageUpload(accessToken);
+          const { uploadUrl, assetUrn } = await this.registerImageUpload(accessToken, authorUrn);
           await this.uploadImageBinary(uploadUrl, imageBuffer, accessToken);
-          postUrn = await this.publishImage(textToPublish, assetUrn, accessToken);
+          postUrn = await this.publishImage(textToPublish, assetUrn, accessToken, authorUrn);
         } catch (imageUploadError) {
           logger.error('Failed to upload and publish image, falling back to text post', imageUploadError);
-          postUrn = await this.publishText(textToPublish, accessToken);
+          postUrn = await this.publishText(textToPublish, accessToken, authorUrn);
         }
       } else {
-        postUrn = await this.publishText(textToPublish, accessToken);
+        postUrn = await this.publishText(textToPublish, accessToken, authorUrn);
       }
     }
 
     if (content.firstComment) {
       try {
         const commentText = this.cleanMarkdownForLinkedIn(content.firstComment);
-        await this.publishComment(postUrn, commentText, accessToken);
+        await this.publishComment(postUrn, commentText, accessToken, authorUrn);
         logger.info(`Strategic first comment published automatically for post: ${postUrn}`);
       } catch (commentError) {
         logger.error(`Failed to publish automatic first comment for ${postUrn}:`, commentError);
@@ -468,5 +468,47 @@ export class LinkedInPublisher {
     }
 
     return postUrn;
+  }
+
+  /**
+   * Fetch all LinkedIn Pages (Organizations) the user administers
+   */
+  static async getManagedOrganizations(accessToken: string): Promise<Array<{ urn: string, name: string }>> {
+    try {
+      // 1. Get Organizational Entity ACLs (Pages the user has a role on)
+      const aclResponse = await axios.get('https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      const elements = aclResponse.data.elements || [];
+      if (elements.length === 0) return [];
+
+      // Extract organization IDs (e.g., from "urn:li:organization:12345" -> "12345")
+      const orgIds = elements.map((el: any) => {
+        const target = el.organizationalTarget;
+        return target.split(':').pop();
+      });
+
+      // 2. Fetch the display names for these organizations
+      const idsParam = orgIds.join(',');
+      const orgResponse = await axios.get(`https://api.linkedin.com/v2/organizations?ids=List(${idsParam})`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      const organizations = [];
+      const results = orgResponse.data.results || {};
+      
+      for (const id in results) {
+        organizations.push({
+          urn: `urn:li:organization:${id}`,
+          name: results[id].localizedName || 'Unknown Page',
+        });
+      }
+
+      return organizations;
+    } catch (error: any) {
+      logger.error('Failed to fetch managed organizations', error.response?.data || error.message);
+      throw new Error(`LinkedIn Org API Error: ${error.response?.data?.message || error.message}`);
+    }
   }
 }

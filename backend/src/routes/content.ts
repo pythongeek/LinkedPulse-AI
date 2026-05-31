@@ -437,7 +437,8 @@ router.post('/:id/publish', authenticate, async (req, res) => {
     // Import dynamically to avoid circular dependencies if any
     const { LinkedInPublisher } = await import('../services/linkedinPublisher.js');
     
-    const postUrn = await LinkedInPublisher.publishContentRecord(content, accessToken, logger);
+    const authorUrn = session?.selectedAuthorUrn || undefined;
+    const postUrn = await LinkedInPublisher.publishContentRecord(content, accessToken, logger, authorUrn);
 
 
     // Update content status

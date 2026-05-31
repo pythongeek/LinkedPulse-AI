@@ -331,6 +331,8 @@ model LinkedInSession {
   refreshToken String? @map("refresh_token")
   clientId     String?  @map("client_id")
   clientSecret String?  @map("client_secret")
+  selectedAuthorUrn String?  @map("selected_author_urn") // e.g. urn:li:person:123 or urn:li:organization:456
+  managedPages      Json?    @map("managed_pages")       // Cache of [{ urn, name }]
   
   @@map("linkedin_sessions")
 }

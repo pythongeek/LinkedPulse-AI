@@ -302,7 +302,7 @@ router.get('/linkedin/login', authenticate, async (req, res) => {
   const protocol = req.protocol === 'http' && host?.includes('localhost') ? 'http' : 'https';
   const backendUrl = process.env.VITE_API_URL || process.env.BACKEND_URL || `${protocol}://${host}`;
   const redirectUri = `${backendUrl}/api/auth/linkedin/callback`;
-  const scope = 'w_member_social openid profile email';
+  const scope = 'w_member_social w_organization_social r_organization_admin openid profile email';
   const state = userId; // Track user
 
   const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${encodeURIComponent(scope)}`;
@@ -374,6 +374,21 @@ router.get('/linkedin/callback', async (req, res) => {
         isActive: true,
       },
     });
+
+    // Fetch user's managed organizations and cache them
+    try {
+      const { LinkedInPublisher } = await import('../services/linkedinPublisher.js');
+      const managedPages = await LinkedInPublisher.getManagedOrganizations(access_token);
+      await prisma.linkedInSession.update({
+        where: { userId },
+        data: {
+          managedPages: managedPages as any,
+        },
+      });
+      logger.info(`Fetched and cached ${managedPages.length} managed pages for user: ${userId}`);
+    } catch (orgErr: any) {
+      logger.error('Failed to fetch managed organizations during callback:', orgErr.response?.data || orgErr.message);
+    }
 
     // Fetch profile details via LinkedIn OAuth /userinfo API
     try {
@@ -505,12 +520,88 @@ router.get('/linkedin/status', authenticate, async (req, res) => {
       hasCustomApp: !!session && !!session.clientId,
       expiresAt: session?.expiresAt || null,
       lastUsed: session?.lastUsed || null,
+      selectedAuthorUrn: session?.selectedAuthorUrn || null,
+      managedPages: session?.managedPages || [],
     });
   } catch (error) {
     logger.error('LinkedIn status error:', error);
     res.status(500).json({
       error: {
         message: 'Failed to check LinkedIn status',
+        code: 'INTERNAL_ERROR',
+      },
+    });
+  }
+});
+
+/**
+ * Set selected LinkedIn publishing target
+ * POST /api/auth/linkedin/target
+ */
+router.post('/linkedin/target', authenticate, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { urn } = req.body;
+
+    const session = await prisma.linkedInSession.update({
+      where: { userId },
+      data: {
+        selectedAuthorUrn: urn || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      selectedAuthorUrn: session.selectedAuthorUrn,
+    });
+  } catch (error) {
+    logger.error('Failed to update target URN:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to update posting target',
+        code: 'INTERNAL_ERROR',
+      },
+    });
+  }
+});
+
+/**
+ * Refresh LinkedIn pages the user manages
+ * POST /api/auth/linkedin/refresh-pages
+ */
+router.post('/linkedin/refresh-pages', authenticate, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const session = await prisma.linkedInSession.findUnique({
+      where: { userId },
+    });
+
+    if (!session || !session.accessToken) {
+      return res.status(400).json({
+        error: {
+          message: 'No active LinkedIn OAuth session found',
+          code: 'NO_SESSION',
+        },
+      });
+    }
+
+    const { LinkedInPublisher } = await import('../services/linkedinPublisher.js');
+    const managedPages = await LinkedInPublisher.getManagedOrganizations(session.accessToken);
+
+    await prisma.linkedInSession.update({
+      where: { userId },
+      data: { managedPages: managedPages as any },
+    });
+
+    res.json({
+      success: true,
+      managedPages,
+    });
+  } catch (error: any) {
+    logger.error('Failed to refresh pages:', error);
+    res.status(500).json({
+      error: {
+        message: error.message || 'Failed to refresh pages',
         code: 'INTERNAL_ERROR',
       },
     });

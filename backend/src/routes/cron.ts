@@ -89,7 +89,8 @@ router.get('/tick', async (req, res) => {
           }
 
           const { LinkedInPublisher } = await import('../services/linkedinPublisher.js');
-          const postUrn = await LinkedInPublisher.publishContentRecord(content, accessToken, logger);
+          const authorUrn = session?.selectedAuthorUrn || undefined;
+          const postUrn = await LinkedInPublisher.publishContentRecord(content, accessToken, logger, authorUrn);
 
           // Update status
           await prisma.content.update({

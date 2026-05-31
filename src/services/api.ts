@@ -122,6 +122,8 @@ export const linkedinApi = {
   getStatus: () => api.get('/auth/linkedin/status'),
   getOAuthUrl: () => api.get('/auth/linkedin/login'),
   saveAppCredentials: (data: any) => api.post('/auth/linkedin/app-credentials', data),
+  updateTarget: (urn: string | null) => api.post('/auth/linkedin/target', { urn }),
+  refreshPages: () => api.post('/auth/linkedin/refresh-pages'),
 };
 
 // System API

@@ -20,6 +20,8 @@ export default function Settings() {
   const [clientSecret, setClientSecret] = useState('');
   const [loadingOAuth, setLoadingOAuth] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState<string>('personal');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const redirectUri = `${import.meta.env.VITE_API_URL || window.location.origin}/api/auth/linkedin/callback`;
 
@@ -46,6 +48,39 @@ export default function Settings() {
       setSearchParams(searchParams);
     }
   }, [searchParams, setSearchParams, refetchStatus, refetchUser]);
+
+  useEffect(() => {
+    if (linkedinStatus?.selectedAuthorUrn) {
+      setSelectedTarget(linkedinStatus.selectedAuthorUrn);
+    } else {
+      setSelectedTarget('personal');
+    }
+  }, [linkedinStatus?.selectedAuthorUrn]);
+
+  const handleTargetChange = async (urn: string) => {
+    const targetValue = urn === 'personal' ? null : urn;
+    setSelectedTarget(urn);
+    try {
+      await linkedinApi.updateTarget(targetValue);
+      toast.success('Publishing target updated successfully');
+      refetchStatus();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to update publishing target');
+    }
+  };
+
+  const handleRefreshPages = async () => {
+    setIsRefreshing(true);
+    try {
+      await linkedinApi.refreshPages();
+      toast.success('Managed pages synchronized successfully');
+      refetchStatus();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to refresh pages');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const connectMutation = useMutation({
     mutationFn: (data: any) => linkedinApi.connect(data),
@@ -175,11 +210,49 @@ export default function Settings() {
             </div>
             <div>
               {linkedinStatus?.hasOAuth ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg border border-slate-100 dark:border-slate-900">
                     <Clock className="h-3 w-3" />
                     <span>OAuth token is managed and refreshed securely.</span>
                   </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Publishing Target
+                    </Label>
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedTarget}
+                        onChange={(e) => handleTargetChange(e.target.value)}
+                        className="flex-1 min-w-0 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="personal">Personal Profile</option>
+                        {Array.isArray(linkedinStatus?.managedPages) &&
+                          linkedinStatus.managedPages.map((page: any) => (
+                            <option key={page.urn} value={page.urn}>
+                              {page.name}
+                            </option>
+                          ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleRefreshPages}
+                        disabled={isRefreshing}
+                        className="h-8 px-2.5 text-xs shrink-0"
+                      >
+                        {isRefreshing ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          'Sync'
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                      Where your scheduled and manual posts will publish.
+                    </p>
+                  </div>
+
                   <Button
                     variant="outline"
                     className="w-full text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive transition-colors text-xs h-9"
