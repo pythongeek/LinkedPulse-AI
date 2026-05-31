@@ -83,21 +83,30 @@ export default function ContentStudio() {
     authorHandle: '@linkedpulse'
   });
 
+  const getDefaultPrompt = (type: string, count: number, cta: string) => {
+    if (type === 'carousel') {
+      return `Create a ${count}-slide LinkedIn carousel. \nSlide 1 (Cover): Bold promise headline ≤ 100 chars.\nSlides 2–${count - 1} (Content): Each slide = one idea. Headline ≤ 150 chars. 3 bullets max, each ≤ 100 chars.\nSlide ${count} (CTA): ${cta} ask.\nCaption: Compelling text post (800–1,200 chars) that teases the content without spoiling it.`;
+    }
+    return CONTENT_TYPE_CONFIGS[type]?.defaultPrompt || '';
+  };
+
+  const [customInstructions, setCustomInstructions] = useState(getDefaultPrompt(contentType, slideCount, ctaType));
+  const [prevDefaultPrompt, setPrevDefaultPrompt] = useState(getDefaultPrompt(contentType, slideCount, ctaType));
   const config = CONTENT_TYPE_CONFIGS[contentType];
-  const [customInstructions, setCustomInstructions] = useState(config?.defaultPrompt || '');
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [selectedHook, setSelectedHook] = useState<string>('');
   const [activeTab, setActiveTab] = useState('content');
 
-  // Keep instructions in sync on content type changes
+  // Keep instructions in sync on content type or carousel settings changes
   useEffect(() => {
-    const activeConfig = CONTENT_TYPE_CONFIGS[contentType];
-    if (activeConfig) {
-      setCustomInstructions(activeConfig.defaultPrompt);
+    const nextDefault = getDefaultPrompt(contentType, slideCount, ctaType);
+    if (customInstructions === prevDefaultPrompt || !customInstructions) {
+      setCustomInstructions(nextDefault);
     }
-  }, [contentType]);
+    setPrevDefaultPrompt(nextDefault);
+  }, [contentType, slideCount, ctaType]);
 
   const [jobPhase, setJobPhase] = useState<number>(0);
   const [jobTotalPhases, setJobTotalPhases] = useState<number>(1);
