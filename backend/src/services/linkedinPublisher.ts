@@ -476,23 +476,32 @@ export class LinkedInPublisher {
   static async getManagedOrganizations(accessToken: string): Promise<Array<{ urn: string, name: string }>> {
     try {
       // 1. Get Organizational Entity ACLs (Pages the user has a role on)
-      const aclResponse = await axios.get('https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED', {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const aclResponse = await axios.get('https://api.linkedin.com/rest/organizationAcls?q=roleAssignee', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'LinkedIn-Version': '202605',
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
       });
 
       const elements = aclResponse.data.elements || [];
-      if (elements.length === 0) return [];
+      const adminOrgs = elements
+        .filter((el: any) => el.role === 'ADMINISTRATOR' && el.state === 'APPROVED')
+        .map((el: any) => el.organization);
+
+      if (adminOrgs.length === 0) return [];
 
       // Extract organization IDs (e.g., from "urn:li:organization:12345" -> "12345")
-      const orgIds = elements.map((el: any) => {
-        const target = el.organizationalTarget;
-        return target.split(':').pop();
-      });
+      const orgIds = adminOrgs.map((urn: string) => urn.split(':').pop());
 
       // 2. Fetch the display names for these organizations
       const idsParam = orgIds.join(',');
-      const orgResponse = await axios.get(`https://api.linkedin.com/v2/organizations?ids=List(${idsParam})`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const orgResponse = await axios.get(`https://api.linkedin.com/rest/organizations?ids=List(${idsParam})`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'LinkedIn-Version': '202605',
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
       });
 
       const organizations = [];
