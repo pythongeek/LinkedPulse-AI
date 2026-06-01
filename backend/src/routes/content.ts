@@ -104,24 +104,25 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { status, contentType, limit = '20', offset = '0' } = req.query;
 
-    const contents = await prisma.content.findMany({
-      where: {
-        userId: req.user!.id,
-        ...(status && { status: status as string }),
-        ...(contentType && { contentType: contentType as string }),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: parseInt(limit as string),
-      skip: parseInt(offset as string),
-    });
+    const where = {
+      userId: req.user!.id,
+      ...(status && { status: status as string }),
+      ...(contentType && { contentType: contentType as string }),
+    };
 
-    const total = await prisma.content.count({
-      where: {
-        userId: req.user!.id,
-        ...(status && { status: status as string }),
-        ...(contentType && { contentType: contentType as string }),
-      },
-    });
+    // ⚡ Bolt Performance Optimization:
+    // What: Replaced sequential database queries with concurrent execution using Promise.all.
+    // Why: Both findMany and count are independent read queries. Running them sequentially takes T(findMany) + T(count).
+    // Impact: Reduces query latency to max(T(findMany), T(count)), effectively halving the database wait time for this endpoint.
+    const [contents, total] = await Promise.all([
+      prisma.content.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: parseInt(limit as string),
+        skip: parseInt(offset as string),
+      }),
+      prisma.content.count({ where }),
+    ]);
 
     res.json({
       contents,
