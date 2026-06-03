@@ -33,7 +33,7 @@ export class LinkedInPublisher {
   }
 
   /**
-   * Publish a text post to LinkedIn via UGC API
+   * Publish a text post to LinkedIn via modern Posts API
    */
   static async publishText(text: string, accessToken: string, authorUrn?: string): Promise<string> {
     try {
@@ -41,31 +41,27 @@ export class LinkedInPublisher {
 
       const payload = {
         author: urn,
+        commentary: text,
+        visibility: 'PUBLIC',
+        distribution: {
+          feedDistribution: 'MAIN_FEED'
+        },
         lifecycleState: 'PUBLISHED',
-        specificContent: {
-          'com.linkedin.ugc.ShareContent': {
-            shareCommentary: {
-              text: text,
-            },
-            shareMediaCategory: 'NONE',
-          },
-        },
-        visibility: {
-          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-        },
       };
 
-      const response = await axios.post('https://api.linkedin.com/v2/ugcPosts', payload, {
+      const response = await axios.post('https://api.linkedin.com/rest/posts', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          'LinkedIn-Version': '202605',
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
       });
 
-      return response.data.id; // Returns the URN of the published post
+      const postId = response.headers['x-restli-id'] || response.data?.id || '';
+      return postId;
     } catch (error: any) {
-      logger.error('Failed to publish to LinkedIn', error.response?.data || error.message);
+      logger.error('Failed to publish text to LinkedIn', error.response?.data || error.message);
       throw new Error(`LinkedIn API Error: ${error.response?.data?.message || error.message}`);
     }
   }
@@ -84,58 +80,56 @@ export class LinkedInPublisher {
 
       const payload = {
         actor: urn,
+        object: postUrn,
         message: {
           text: commentText,
         },
       };
 
       const encodedPostUrn = encodeURIComponent(postUrn);
-      const url = `https://api.linkedin.com/v2/socialActions/${encodedPostUrn}/comments`;
+      const url = `https://api.linkedin.com/rest/socialActions/${encodedPostUrn}/comments`;
 
       const response = await axios.post(url, payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          'LinkedIn-Version': '202605',
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
       });
 
-      return response.data.id;
+      const commentId = response.headers['x-restli-id'] || response.data?.id || '';
+      return commentId;
     } catch (error: any) {
       logger.error('Failed to publish comment to LinkedIn', error.response?.data || error.message);
       throw new Error(`LinkedIn Comment API Error: ${error.response?.data?.message || error.message}`);
     }
   }
+
   /**
-   * Register an image upload with LinkedIn Assets API
+   * Register an image upload with LinkedIn modern Images API
    */
   static async registerImageUpload(accessToken: string, authorUrn?: string): Promise<{ uploadUrl: string; assetUrn: string }> {
     try {
       const urn = authorUrn || await this.getAuthorUrn(accessToken);
 
       const payload = {
-        registerUploadRequest: {
-          recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+        initializeUploadRequest: {
           owner: urn,
-          serviceRelationships: [
-            {
-              relationshipType: 'OWNER',
-              identifier: 'urn:li:userGeneratedContent',
-            },
-          ],
         },
       };
 
-      const response = await axios.post('https://api.linkedin.com/v2/assets?action=registerUpload', payload, {
+      const response = await axios.post('https://api.linkedin.com/rest/images?action=initializeUpload', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          'LinkedIn-Version': '202605',
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
       });
 
-      const uploadUrl = response.data.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
-      const assetUrn = response.data.value.asset;
+      const uploadUrl = response.data.value.uploadUrl;
+      const assetUrn = response.data.value.image;
 
       return { uploadUrl, assetUrn };
     } catch (error: any) {
@@ -152,7 +146,7 @@ export class LinkedInPublisher {
       await axios.put(uploadUrl, imageBuffer, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/octet-stream',
+          'Content-Type': 'image/jpeg',
         },
       });
     } catch (error: any) {
@@ -162,7 +156,7 @@ export class LinkedInPublisher {
   }
 
   /**
-   * Publish a text post with an attached image via UGC API
+   * Publish a text post with an attached image via modern Posts API
    */
   static async publishImage(text: string, assetUrn: string, accessToken: string, authorUrn?: string): Promise<string> {
     try {
@@ -170,38 +164,30 @@ export class LinkedInPublisher {
 
       const payload = {
         author: urn,
+        commentary: text,
+        visibility: 'PUBLIC',
+        distribution: {
+          feedDistribution: 'MAIN_FEED'
+        },
+        content: {
+          media: {
+            id: assetUrn
+          }
+        },
         lifecycleState: 'PUBLISHED',
-        specificContent: {
-          'com.linkedin.ugc.ShareContent': {
-            shareCommentary: {
-              text: text,
-            },
-            shareMediaCategory: 'IMAGE',
-            media: [
-              {
-                status: 'READY',
-                description: {
-                  text: 'Image',
-                },
-                media: assetUrn,
-              },
-            ],
-          },
-        },
-        visibility: {
-          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-        },
       };
 
-      const response = await axios.post('https://api.linkedin.com/v2/ugcPosts', payload, {
+      const response = await axios.post('https://api.linkedin.com/rest/posts', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          'LinkedIn-Version': '202605',
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
       });
 
-      return response.data.id; // Returns the URN of the published post
+      const postId = response.headers['x-restli-id'] || response.data?.id || '';
+      return postId;
     } catch (error: any) {
       logger.error('Failed to publish image post to LinkedIn', error.response?.data || error.message);
       throw new Error(`LinkedIn API Error: ${error.response?.data?.message || error.message}`);
