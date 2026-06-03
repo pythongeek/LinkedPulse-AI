@@ -1177,4 +1177,65 @@ Provide only the regenerated section.`,
       return content;
     }
   }
+
+  /**
+   * Generate topic cluster based on user context and optional iteration feedback
+   */
+  async generateTopicCluster(context: string, feedback?: string, previousTopics?: any[]): Promise<any> {
+    try {
+      const promptText = feedback
+        ? `The user wants to refine a previous topic cluster based on this feedback: "${feedback}"
+        
+PREVIOUS TOPICS:
+${JSON.stringify(previousTopics)}
+
+Please regenerate the topic cluster of 5 topics incorporating this feedback. Keep the context in mind: "${context}"`
+        : `Generate a topic cluster of 5 highly engaging LinkedIn topics based on this context: "${context}"`;
+
+      const result = await this.minimax.promptJSON(
+        'You are a LinkedIn content strategist specializing in topic authority and content clusters.',
+        `${promptText}
+
+Return a JSON object with this exact structure:
+{
+  "topics": [
+    {
+      "keyword": "Main topic / focus keyword phrase (2-4 words)",
+      "description": "Brief description of the content angle (1-2 sentences)",
+      "targetAudience": "Specific target audience for this post",
+      "contentType": "post" | "carousel" | "article" | "poll",
+      "engagementReason": "Why this topic will resonate on LinkedIn (1 sentence)"
+    }
+  ]
+}`
+      );
+      return result.topics || [];
+    } catch (error) {
+      logger.error('Generate topic cluster error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Fulfill additional requests for an approved topic cluster
+   */
+  async handleAdditionalWants(topics: any[], request: string): Promise<string> {
+    try {
+      const prompt = `The user has approved a 5-topic LinkedIn cluster. Here are the topics:
+${JSON.stringify(topics)}
+
+The user is asking for the following additional thing: "${request}"
+
+Please fulfill the user's request in detail. Provide a helpful, professional response formatted in clean markdown.`;
+
+      return await this.minimax.prompt(
+        'You are a LinkedIn content strategist and assistant.',
+        prompt,
+        { temperature: 0.7 }
+      );
+    } catch (error) {
+      logger.error('Handle additional wants error:', error);
+      throw error;
+    }
+  }
 }

@@ -533,4 +533,137 @@ router.post('/:id/image/regenerate', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * Generate a topic cluster based on user context and optional iteration feedback
+ * POST /api/content/topic-cluster
+ */
+router.post('/topic-cluster', authenticate, async (req, res) => {
+  try {
+    const { context, feedback, previousTopics } = req.body;
+    if (!context) {
+      return res.status(400).json({ error: { message: 'Context is required' } });
+    }
+
+    const contentService = new ContentGenerationService();
+    const topics = await contentService.generateTopicCluster(context, feedback, previousTopics);
+
+    res.json({ topics });
+  } catch (error: any) {
+    logger.error('Topic cluster generation error:', error);
+    res.status(500).json({
+      error: {
+        message: error.message || 'Failed to generate topic cluster',
+        code: 'CLUSTER_ERROR',
+      },
+    });
+  }
+});
+
+/**
+ * Enqueue content generation jobs for a topic cluster, optionally scheduling them
+ * POST /api/content/schedule-cluster
+ */
+router.post('/schedule-cluster', authenticate, async (req, res) => {
+  try {
+    const { topics, schedule } = req.body; // schedule: boolean
+    const userId = req.user!.id;
+
+    if (!Array.isArray(topics) || topics.length === 0) {
+      return res.status(400).json({ error: { message: 'Topics array is required' } });
+    }
+
+    // Save topics to user's TopicWatchlist
+    for (const t of topics) {
+      try {
+        await prisma.topicWatchlist.create({
+          data: {
+            userId,
+            keyword: t.keyword,
+            contentType: t.contentType || 'post',
+            topicType: 'cluster',
+            audienceSegment: t.targetAudience || 'B2B',
+          },
+        });
+      } catch (err) {
+        logger.warn(`Failed to create topic watchlist item for ${t.keyword}:`, err);
+      }
+    }
+
+    const jobIds: string[] = [];
+    const now = new Date();
+
+    for (let i = 0; i < topics.length; i++) {
+      const topic = topics[i];
+      
+      // Stagger schedule by i + 1 days starting tomorrow if schedule is true
+      let scheduledFor: string | undefined = undefined;
+      if (schedule) {
+        const date = new Date(now);
+        date.setDate(now.getDate() + (i + 1));
+        // Default to 10:00 AM
+        date.setHours(10, 0, 0, 0);
+        scheduledFor = date.toISOString();
+      }
+
+      // Enqueue job
+      const job = await JobService.enqueue('CONTENT_GENERATION', {
+        userId,
+        options: {
+          topic: topic.keyword,
+          contentType: topic.contentType || 'post',
+          targetAudience: topic.targetAudience,
+          researchDepth: 'quick',
+          includeImages: true,
+          status: schedule ? 'scheduled' : 'draft',
+          scheduledFor,
+        },
+      });
+
+      jobIds.push(job.id);
+    }
+
+    res.json({
+      success: true,
+      message: schedule 
+        ? `Successfully scheduled ${topics.length} posts stagger-scheduled starting tomorrow`
+        : `Successfully enqueued ${topics.length} drafts for generation`,
+      jobIds,
+    });
+  } catch (error: any) {
+    logger.error('Schedule cluster error:', error);
+    res.status(500).json({
+      error: {
+        message: error.message || 'Failed to schedule cluster',
+        code: 'SCHEDULE_CLUSTER_ERROR',
+      },
+    });
+  }
+});
+
+/**
+ * Handle user's additional requests for approved topic clusters
+ * POST /api/content/cluster-additional
+ */
+router.post('/cluster-additional', authenticate, async (req, res) => {
+  try {
+    const { topics, request } = req.body;
+    if (!request) {
+      return res.status(400).json({ error: { message: 'Request is required' } });
+    }
+
+    const contentService = new ContentGenerationService();
+    const responseText = await contentService.handleAdditionalWants(topics, request);
+
+    res.json({ response: responseText });
+  } catch (error: any) {
+    logger.error('Cluster additional request error:', error);
+    res.status(500).json({
+      error: {
+        message: error.message || 'Failed to process request',
+        code: 'ADDITIONAL_ERROR',
+      },
+    });
+  }
+});
+
 export default router;

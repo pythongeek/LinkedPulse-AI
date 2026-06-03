@@ -47,6 +47,12 @@ export const contentApi = {
   getSuggestions: (data: any) => api.post('/content/suggestions', data),
   publish: (id: string) => api.post(`/content/${id}/publish`),
   regenerateImage: (id: string, data?: any) => api.post(`/content/${id}/image/regenerate`, data),
+  generateTopicCluster: (data: { context: string; feedback?: string; previousTopics?: any[] }) =>
+    api.post('/content/topic-cluster', data),
+  scheduleCluster: (data: { topics: any[]; schedule: boolean }) =>
+    api.post('/content/schedule-cluster', data),
+  additionalRequestCluster: (data: { topics: any[]; request: string }) =>
+    api.post('/content/cluster-additional', data),
 };
 
 // Job API

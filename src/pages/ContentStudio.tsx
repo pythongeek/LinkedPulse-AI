@@ -34,7 +34,12 @@ import {
   User,
   Sliders,
   CheckSquare,
-  CalendarIcon
+  CalendarIcon,
+  Layers,
+  Send,
+  ThumbsUp,
+  Check,
+  HelpCircle
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -98,6 +103,20 @@ export default function ContentStudio() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [selectedHook, setSelectedHook] = useState<string>('');
   const [activeTab, setActiveTab] = useState('content');
+
+  // Mode selection: 'editor' | 'cluster'
+  const [studioMode, setStudioMode] = useState<'editor' | 'cluster'>('editor');
+
+  // Topic Cluster states
+  const [clusterContext, setClusterContext] = useState('');
+  const [clusterFeedback, setClusterFeedback] = useState('');
+  const [generatedCluster, setGeneratedCluster] = useState<any[] | null>(null);
+  const [isGeneratingCluster, setIsGeneratingCluster] = useState(false);
+  const [isSchedulingCluster, setIsSchedulingCluster] = useState(false);
+  const [clusterScheduledStatus, setClusterScheduledStatus] = useState<'idle' | 'scheduled' | 'drafts' | 'additional'>('idle');
+  const [additionalWants, setAdditionalWants] = useState('');
+  const [additionalResponse, setAdditionalResponse] = useState<string | null>(null);
+  const [isProcessingAdditional, setIsProcessingAdditional] = useState(false);
 
   // Keep instructions in sync on content type or carousel settings changes
   useEffect(() => {
@@ -377,6 +396,93 @@ export default function ContentStudio() {
     toast.info('Hook suggestions are regenerated during draft generation. Please click "Generate Draft" to refresh suggestions.');
   };
 
+  const handleGenerateCluster = async () => {
+    if (!clusterContext.trim()) {
+      toast.error('Please enter context guidelines');
+      return;
+    }
+    setIsGeneratingCluster(true);
+    setClusterScheduledStatus('idle');
+    setAdditionalResponse(null);
+    setAdditionalWants('');
+    try {
+      const res = await contentApi.generateTopicCluster({ context: clusterContext });
+      setGeneratedCluster(res.data.topics || []);
+      toast.success('Successfully generated topic cluster!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to generate topic cluster');
+    } finally {
+      setIsGeneratingCluster(false);
+    }
+  };
+
+  const handleRefineCluster = async () => {
+    if (!clusterFeedback.trim()) {
+      toast.error('Please enter feedback to refine the cluster');
+      return;
+    }
+    setIsGeneratingCluster(true);
+    try {
+      const res = await contentApi.generateTopicCluster({
+        context: clusterContext,
+        feedback: clusterFeedback,
+        previousTopics: generatedCluster || [],
+      });
+      setGeneratedCluster(res.data.topics || []);
+      setClusterFeedback('');
+      toast.success('Topic cluster refined!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to refine cluster');
+    } finally {
+      setIsGeneratingCluster(false);
+    }
+  };
+
+  const handleScheduleCluster = async (schedule: boolean) => {
+    if (!generatedCluster || generatedCluster.length === 0) {
+      toast.error('No topics to save');
+      return;
+    }
+    setIsSchedulingCluster(true);
+    try {
+      await contentApi.scheduleCluster({
+        topics: generatedCluster,
+        schedule,
+      });
+      if (schedule) {
+        setClusterScheduledStatus('scheduled');
+        toast.success('Staggered scheduling configured successfully!');
+      } else {
+        setClusterScheduledStatus('drafts');
+        toast.success('Topics saved as drafts successfully!');
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to save or schedule cluster');
+    } finally {
+      setIsSchedulingCluster(false);
+    }
+  };
+
+  const handleSubmitAdditionalWants = async () => {
+    if (!additionalWants.trim()) {
+      toast.error('Please enter your request');
+      return;
+    }
+    setIsProcessingAdditional(true);
+    try {
+      const res = await contentApi.additionalRequestCluster({
+        topics: generatedCluster || [],
+        request: additionalWants,
+      });
+      setAdditionalResponse(res.data.response);
+      toast.success('AI response generated!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to process request');
+    } finally {
+      setIsProcessingAdditional(false);
+    }
+  };
+
   const getEngagementColor = (score: number) => {
     if (score >= 80) return 'text-green-500 bg-green-500/10 border-green-500/20';
     if (score >= 60) return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
@@ -410,6 +516,34 @@ export default function ContentStudio() {
           <p className="text-slate-400 text-base max-w-2xl leading-relaxed font-medium">
             Generate algorithm-optimized, fact-checked, visual content and slides using our specialized LinkedIn agent pipeline.
           </p>
+          <div className="flex gap-3 mt-4">
+            <Button
+              variant={studioMode === 'editor' ? 'default' : 'outline'}
+              className={cn(
+                "h-10 px-5 rounded-xl font-semibold text-xs border border-white/5 transition-all",
+                studioMode === 'editor' 
+                  ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] border-indigo-500" 
+                  : "bg-white/[0.02] border-white/5 text-slate-300 hover:bg-white/5"
+              )}
+              onClick={() => setStudioMode('editor')}
+            >
+              <Wand2 className="w-4 h-4 mr-2" />
+              Studio Editor
+            </Button>
+            <Button
+              variant={studioMode === 'cluster' ? 'default' : 'outline'}
+              className={cn(
+                "h-10 px-5 rounded-xl font-semibold text-xs border border-white/5 transition-all",
+                studioMode === 'cluster' 
+                  ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] border-indigo-500" 
+                  : "bg-white/[0.02] border-white/5 text-slate-300 hover:bg-white/5"
+              )}
+              onClick={() => setStudioMode('cluster')}
+            >
+              <Layers className="w-4 h-4 mr-2" />
+              Topic Cluster Architect
+            </Button>
+          </div>
         </div>
         
         {/* System API Capability status indicators */}
@@ -450,7 +584,8 @@ export default function ContentStudio() {
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-12 items-start">
+      {studioMode === 'editor' ? (
+        <div className="grid gap-8 lg:grid-cols-12 items-start">
         {/* Input Settings Panel (Grid col 5) */}
         <div className="lg:col-span-4 xl:col-span-3 space-y-6">
           <Card className="border-0 bg-[#0a0a0c]/80 backdrop-blur-3xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden relative ring-1 ring-white/5">
@@ -1229,6 +1364,236 @@ export default function ContentStudio() {
           </Card>
         </div>
       </div>
+      ) : (
+        <div className="space-y-8 max-w-[1200px] mx-auto">
+          {/* Context Input Area */}
+          <Card className="border-0 bg-[#0a0a0c]/80 backdrop-blur-3xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden relative ring-1 ring-white/5">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-purple-500/5 pointer-events-none" />
+            <CardHeader className="pb-5 relative z-10 border-b border-white/5 bg-white/[0.02]">
+              <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                <Layers className="w-5 h-5 text-indigo-400" />
+                Topic Cluster Generator
+              </CardTitle>
+              <CardDescription className="text-sm text-slate-400">
+                Input your company background or campaign guidelines to construct a cohesive cluster of 5 high-performing topics.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-6 relative z-10">
+              <div className="space-y-2">
+                <Label htmlFor="cluster-context" className="text-xs font-bold uppercase tracking-wider text-slate-400">Campaign Context & Guidelines</Label>
+                <Textarea
+                  id="cluster-context"
+                  placeholder="Example: We build a SaaS product for automating customer support. We target Series A tech startups who care about high response quality, SLA, and developer productivity..."
+                  value={clusterContext}
+                  onChange={(e) => setClusterContext(e.target.value)}
+                  rows={4}
+                  className="bg-card/45 border-border font-sans text-sm leading-relaxed"
+                />
+              </div>
+
+              {!generatedCluster && (
+                <Button
+                  onClick={handleGenerateCluster}
+                  className="w-full h-12 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-bold text-sm shadow-[0_0_20px_rgba(99,102,241,0.4)] transition-all rounded-xl"
+                  disabled={isGeneratingCluster}
+                >
+                  {isGeneratingCluster ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing context & mapping authority cluster...</>
+                  ) : (
+                    <><Wand2 className="w-4 h-4 mr-2" /> Map Topic Cluster</>
+                  )}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Cluster List / Preview */}
+          {isGeneratingCluster && !generatedCluster && (
+            <div className="flex flex-col items-center justify-center py-20 space-y-4">
+              <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
+              <p className="text-slate-400 text-sm font-semibold">Our agent network is modeling your topic authority...</p>
+            </div>
+          )}
+
+          {generatedCluster && (
+            <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-indigo-400" />
+                    Generated Topic Authority Cluster
+                  </h3>
+                  <p className="text-xs text-slate-400">Review, iterate, or approve this 5-topic layout.</p>
+                </div>
+                {clusterScheduledStatus === 'idle' && (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleScheduleCluster(true)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-10 px-4 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.3)] transition"
+                      disabled={isSchedulingCluster}
+                    >
+                      {isSchedulingCluster ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Check className="w-3.5 h-3.5 mr-1" />}
+                      Approve & Stagger-Schedule
+                    </Button>
+                    <Button
+                      onClick={() => handleScheduleCluster(false)}
+                      variant="outline"
+                      className="border-white/10 hover:bg-white/5 text-slate-300 font-bold text-xs h-10 px-4 rounded-xl transition"
+                      disabled={isSchedulingCluster}
+                    >
+                      Approve & Save as Drafts
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Grid of Topics */}
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {generatedCluster.map((t, idx) => (
+                  <Card key={idx} className="border-0 bg-[#0f0f12] backdrop-blur-3xl shadow-xl ring-1 ring-white/5 relative overflow-hidden flex flex-col min-h-[220px]">
+                    <div className="absolute top-0 right-0 bg-indigo-500/10 border-b border-l border-white/5 text-indigo-400 font-mono text-[10px] px-2 py-1 font-bold">
+                      Topic #{idx + 1}
+                    </div>
+                    <CardHeader className="pb-3 pt-5">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        <Badge className="bg-indigo-500/20 text-indigo-300 border-none font-bold text-[9px] uppercase tracking-wider">
+                          {t.contentType || 'post'}
+                        </Badge>
+                        <Badge variant="outline" className="border-white/10 text-slate-400 font-semibold text-[9px] uppercase">
+                          {t.targetAudience || 'General'}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-base font-bold text-white line-clamp-2 leading-snug">
+                        {t.keyword}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col justify-between text-xs space-y-4">
+                      <p className="text-slate-400 leading-relaxed font-sans">{t.description}</p>
+                      {t.engagementReason && (
+                        <div className="pt-2 border-t border-white/5">
+                          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-none mb-1">Why it works:</p>
+                          <p className="text-slate-400 leading-normal italic font-sans">"{t.engagementReason}"</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* FeedBack Input / Refine panel */}
+              {clusterScheduledStatus === 'idle' && (
+                <Card className="border-0 bg-white/[0.02] backdrop-blur-3xl ring-1 ring-white/5 shadow-inner">
+                  <CardContent className="p-5 space-y-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cluster-feedback" className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin-slow" />
+                        Refine Cluster / Iterate Topic Angles
+                      </Label>
+                      <Input
+                        id="cluster-feedback"
+                        placeholder="e.g., Change format of post #2 to a Poll, or target more senior directors instead of builders..."
+                        value={clusterFeedback}
+                        onChange={(e) => setClusterFeedback(e.target.value)}
+                        className="bg-card/45 border-border text-xs h-10"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleRefineCluster}
+                      className="bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/40 text-xs font-bold h-9 px-4 rounded-xl transition"
+                      disabled={isGeneratingCluster}
+                    >
+                      {isGeneratingCluster ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                      Refine Cluster layout
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Staggered Scheduling Success / Additional Requests Panel */}
+              {clusterScheduledStatus !== 'idle' && (
+                <div className="space-y-6">
+                  {/* Success Alert */}
+                  <div className={cn(
+                    "p-5 rounded-2xl border flex items-start gap-4 shadow-lg animate-[fadeIn_0.3s_ease-out]",
+                    clusterScheduledStatus === 'scheduled'
+                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                      : "bg-indigo-500/10 border-indigo-500/20 text-indigo-300"
+                  )}>
+                    <div className={cn(
+                      "p-2 rounded-xl text-white font-bold",
+                      clusterScheduledStatus === 'scheduled' ? "bg-emerald-600" : "bg-indigo-600"
+                    )}>
+                      <Check className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-base font-bold text-white leading-snug">
+                        {clusterScheduledStatus === 'scheduled' ? 'Staggered Campaign Scheduled!' : 'Topics Enqueued as Drafts!'}
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-xl">
+                        {clusterScheduledStatus === 'scheduled'
+                          ? 'Successfully scheduled 5 posts, stagger-scheduled 1 post per day starting tomorrow at 10:00 AM. Watchlist topics created.'
+                          : 'Successfully saved 5 topics to your watchlist and enqueued content generation drafts.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Ask for additional things */}
+                  <Card className="border-0 bg-[#0a0a0c]/80 backdrop-blur-3xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden relative ring-1 ring-white/5">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-purple-500/5 pointer-events-none" />
+                    <CardHeader className="pb-4 relative z-10 border-b border-white/5 bg-white/[0.02]">
+                      <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                        <HelpCircle className="w-4.5 h-4.5 text-indigo-400" />
+                        Additional Customizations
+                      </CardTitle>
+                      <CardDescription className="text-xs text-slate-400">
+                        Is there anything else you want? (e.g. Generate a summary newsletter, write promotional hook formulas, or outline slides)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5 pt-5 relative z-10">
+                      <div className="space-y-2">
+                        <Label htmlFor="additional-wants" className="text-xs font-semibold text-slate-400">What additional things do you want?</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="additional-wants"
+                            placeholder="e.g. Generate a B2B newsletter summarizing these 5 topics..."
+                            value={additionalWants}
+                            onChange={(e) => setAdditionalWants(e.target.value)}
+                            className="bg-card/45 border-border text-sm flex-1 h-11"
+                          />
+                          <Button
+                            onClick={handleSubmitAdditionalWants}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 h-11 rounded-xl shadow-[0_0_15px_rgba(99,102,241,0.3)] transition"
+                            disabled={isProcessingAdditional || !additionalWants.trim()}
+                          >
+                            {isProcessingAdditional ? (
+                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                            ) : (
+                              <><Send className="w-4 h-4 mr-2" /> Send Request</>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Display AI Assistant Response */}
+                      {additionalResponse && (
+                        <div className="mt-4 p-5 rounded-xl border border-white/5 bg-black/40 text-xs font-sans text-slate-300 overflow-y-auto max-h-[400px] space-y-2 leading-relaxed animate-[fadeIn_0.4s_ease-out]">
+                          <div className="flex items-center gap-2 border-b border-white/5 pb-2 mb-2">
+                            <Sparkles className="w-4 h-4 text-indigo-400" />
+                            <span className="font-bold text-white uppercase tracking-wider text-[10px]">AI Strategic Response</span>
+                          </div>
+                          <div className="prose prose-invert prose-xs max-w-none whitespace-pre-wrap">
+                            {additionalResponse}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
     </div>
   );
