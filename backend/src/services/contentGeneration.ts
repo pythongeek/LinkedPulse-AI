@@ -36,6 +36,7 @@ export interface ContentGenerationOptions {
 export interface GeneratedContent {
   title: string;
   content: string;
+  body?: string;
   outline: any;
   researchData: any;
   sources: any[];
@@ -321,6 +322,7 @@ export class ContentGenerationService {
     return {
       title: verified.title || verified.question || topic,
       content: contentBody,
+      body: contentBody,
       outline: verified.outline || verified.sections || null,
       researchData,
       sources: verified.sources,
@@ -591,11 +593,13 @@ Return JSON:
         { temperature: 0.8 }
       );
 
+      const postBody = result.body || result.content || result.text || result.articleBody || '';
       return {
         ...result,
-        content: result.body,
+        body: postBody,
+        content: postBody,
         outline: outline || { sections: [] },
-        formattedContent: result.body,
+        formattedContent: postBody,
       };
     } catch (error) {
       logger.error('Write post agent error:', error);
@@ -660,12 +664,14 @@ Return JSON:
         { temperature: 0.8 }
       );
 
+      const carouselCaption = result.caption || result.content || result.body || result.text || '';
       return {
         ...result,
         title: result.slides?.[0]?.headline || topic,
-        content: result.caption,
+        body: carouselCaption,
+        content: carouselCaption,
         outline: outline || { sections: [] },
-        formattedContent: result.caption,
+        formattedContent: carouselCaption,
       };
     } catch (error) {
       logger.error('Write carousel agent error:', error);
@@ -732,12 +738,14 @@ Return JSON:
         { temperature: 0.8, maxTokens: 4096 }
       );
 
+      const articleBody = result.body || result.content || result.articleBody || result.text || '';
       return {
         ...result,
-        articleTitle: result.title,
-        content: result.body,
+        articleTitle: result.title || topic,
+        body: articleBody,
+        content: articleBody,
         outline: result.sections || outline || { sections: [] },
-        formattedContent: result.body,
+        formattedContent: articleBody,
       };
     } catch (error) {
       logger.error('Write article agent error:', error);
@@ -802,12 +810,14 @@ Return JSON:
         { temperature: 0.8 }
       );
 
+      const pollIntro = result.introText || result.content || result.body || result.text || '';
       return {
         ...result,
         title: result.question,
-        content: result.introText,
+        body: pollIntro,
+        content: pollIntro,
         outline: { sections: [] },
-        formattedContent: result.introText,
+        formattedContent: pollIntro,
       };
     } catch (error) {
       logger.error('Write poll agent error:', error);
@@ -854,13 +864,13 @@ Return JSON:
 STRICT RULE: Do NOT output any conversational text, greetings, or warnings. ONLY output the requested JSON object. If you encounter an error or missing data, still output valid JSON with your best attempt at editing.`
       );
 
-      let editedContent = result.content;
+      let editedContent = result.content || result.body || result.text || '';
       if (editedContent && typeof editedContent === 'object') {
         logger.warn('[EditingAgent] result.content returned as object, extracting string');
         editedContent = editedContent.content || editedContent.caption || editedContent.text || JSON.stringify(editedContent);
       }
 
-      return { ...draft, content: editedContent, formattedContent: editedContent };
+      return { ...draft, content: editedContent, body: editedContent, formattedContent: editedContent };
     } catch (error) {
       logger.error('Editing agent error:', error);
       return draft;
@@ -902,13 +912,13 @@ Return JSON:
         { temperature: 0.2 }
       );
 
-      let verifiedContent = result.content;
+      let verifiedContent = result.content || result.body || result.text || '';
       if (verifiedContent && typeof verifiedContent === 'object') {
         logger.warn('[FactCheckAgent] result.content returned as object, extracting string');
         verifiedContent = verifiedContent.content || verifiedContent.caption || verifiedContent.text || JSON.stringify(verifiedContent);
       }
 
-      return { ...content, content: verifiedContent, formattedContent: verifiedContent, sources, factsChecked: result.factsChecked || [], modified: result.modified || false };
+      return { ...content, content: verifiedContent, body: verifiedContent, formattedContent: verifiedContent, sources, factsChecked: result.factsChecked || [], modified: result.modified || false };
     } catch (error) {
       logger.error('Fact check agent error:', error);
       return { ...content, verified: false, sources, factsChecked: [], modified: false };

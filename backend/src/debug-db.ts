@@ -3,18 +3,20 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 async function main() {
-  const sessions = await prisma.linkedInSession.findMany();
-  console.log('LinkedIn Sessions in DB:', JSON.stringify(sessions, null, 2));
-  
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      linkedinCookies: true
-    }
+  const jobs = await prisma.queuedJob.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 10
   });
-  console.log('Users in DB:', JSON.stringify(users, null, 2));
+  console.log('--- LATEST 10 JOBS IN DB ---');
+  jobs.forEach(j => {
+    console.log(`ID: ${j.id}`);
+    console.log(`Type: ${j.type}`);
+    console.log(`Status: ${j.status}`);
+    console.log(`Phase: ${j.phase}/${j.totalPhases}`);
+    console.log(`Error: ${j.error}`);
+    console.log(`Payload: ${JSON.stringify(j.payload)}`);
+    console.log('----------------------------');
+  });
 }
 
 main().catch(console.error);
