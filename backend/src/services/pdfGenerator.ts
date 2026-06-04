@@ -252,9 +252,19 @@ export class PdfGeneratorService {
     doc.restore();
   }
 
-  private static formatBodyText(text: string): string {
+  private static formatBodyText(text: any): string {
     if (!text) return '';
-    return text.split('\n').map(line => {
+    
+    let strText = '';
+    if (Array.isArray(text)) {
+      strText = text.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n');
+    } else if (typeof text === 'object') {
+      strText = text.body || text.text || text.content || JSON.stringify(text);
+    } else {
+      strText = String(text);
+    }
+
+    return strText.split('\n').map(line => {
       const trimmed = line.trim();
       if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
         return `•  ${trimmed.substring(2)}`;
