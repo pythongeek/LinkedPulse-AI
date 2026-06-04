@@ -113,10 +113,13 @@ export class PdfGeneratorService {
           // 1. Draw Global Background
           doc.rect(0, 0, 1080, 1080).fill(activeTheme.backgroundColor);
 
-          // 2. Draw Global Footer
+          // 2. Draw Progress Bar (at the top of each slide)
+          this.drawProgressBar(doc, index + 1, sortedSlides.length, activeTheme);
+
+          // 3. Draw Global Footer
           this.drawFooter(doc, slide, index + 1, sortedSlides.length, activeTheme, regularFont, boldFont);
 
-          // 3. Render Specific Slide Layouts
+          // 4. Render Specific Slide Layouts
           const slideType = slide.type ? slide.type.toLowerCase() : 'content';
           switch (slideType) {
             case 'cover':
@@ -148,6 +151,37 @@ export class PdfGeneratorService {
     });
   }
 
+  private static drawProgressBar(
+    doc: PDFKit.PDFDocument,
+    current: number,
+    total: number,
+    theme: CarouselTheme
+  ) {
+    if (total <= 1) return;
+    
+    const startX = 100;
+    const endX = 980;
+    const width = endX - startX;
+    const y = 50;
+    const height = 6;
+    
+    // Draw background track (low opacity accent)
+    doc.save();
+    doc.roundedRect(startX, y, width, height, 3)
+       .fillColor(theme.accentColor)
+       .fillOpacity(0.15)
+       .fill();
+    doc.restore();
+    
+    // Draw active track
+    const activeWidth = (current / total) * width;
+    doc.save();
+    doc.roundedRect(startX, y, activeWidth, height, 3)
+       .fillColor(theme.primaryColor)
+       .fill();
+    doc.restore();
+  }
+
   private static drawCoverSlide(
     doc: PDFKit.PDFDocument,
     slide: SlideData,
@@ -155,18 +189,67 @@ export class PdfGeneratorService {
     regularFont: string,
     boldFont: string
   ) {
-    // Large accent block on left
-    doc.rect(100, 250, 150, 15).fill(theme.primaryColor);
+    // Top-right background design accent (large abstract circle)
+    doc.save();
+    doc.circle(950, 150, 300)
+       .fillColor(theme.primaryColor)
+       .fillOpacity(0.08)
+       .fill();
+    doc.restore();
+
+    // Bottom-left background design accent (smaller circle)
+    doc.save();
+    doc.circle(100, 950, 200)
+       .fillColor(theme.primaryColor)
+       .fillOpacity(0.04)
+       .fill();
+    doc.restore();
+
+    // Left decorative brand bar
+    doc.save();
+    doc.roundedRect(100, 220, 16, 120, 8)
+       .fillColor(theme.primaryColor)
+       .fill();
+    doc.restore();
+
+    // Author brand label at top
+    doc.fontSize(24)
+       .fillColor(theme.primaryColor)
+       .font(boldFont)
+       .text(theme.authorName.toUpperCase(), 130, 225, { characterSpacing: 1.5 });
+       
+    doc.fontSize(20)
+       .fillColor(theme.accentColor)
+       .font(regularFont)
+       .text(theme.authorHandle, 130, 255);
 
     // Title text
-    doc.fontSize(75)
+    doc.fontSize(72)
        .fillColor(theme.textColor)
        .font(boldFont)
-       .text(slide.headline || '', 100, 320, {
+       .text(slide.headline || '', 100, 390, {
          width: 880,
          align: 'left',
-         lineGap: 20
+         lineGap: 18
        });
+
+    // Swipe prompt at bottom
+    const yPosition = Math.max(doc.y + 60, 750);
+    
+    doc.save();
+    doc.roundedRect(100, yPosition, 260, 56, 12)
+       .fillColor(theme.primaryColor)
+       .fill();
+       
+    doc.fontSize(22)
+       .fillColor('#FFFFFF')
+       .font(boldFont)
+       .text('SWIPE LEFT  ▶', 100, yPosition + 17, {
+         width: 260,
+         align: 'center',
+         characterSpacing: 1
+       });
+    doc.restore();
   }
 
   private static formatBodyText(text: string): string {
@@ -189,11 +272,25 @@ export class PdfGeneratorService {
     regularFont: string,
     boldFont: string
   ) {
+    // Subtle background circle accent
+    doc.save();
+    doc.circle(980, 540, 150)
+       .fillColor(theme.primaryColor)
+       .fillOpacity(0.03)
+       .fill();
+    doc.restore();
+
+    // Small category/context tag at top
+    doc.fontSize(18)
+       .fillColor(theme.primaryColor)
+       .font(boldFont)
+       .text(theme.authorName.toUpperCase(), 100, 110, { characterSpacing: 1 });
+
     // Title
-    doc.fontSize(52)
+    doc.fontSize(50)
        .fillColor(theme.textColor)
        .font(boldFont)
-       .text(slide.headline || '', 100, 150, {
+       .text(slide.headline || '', 100, 140, {
          width: 880,
          align: 'left',
          lineGap: 10
@@ -202,18 +299,22 @@ export class PdfGeneratorService {
     const currentY = doc.y;
 
     // Accent line below title
-    doc.rect(100, currentY + 20, 120, 8).fill(theme.primaryColor);
+    doc.save();
+    doc.roundedRect(100, currentY + 25, 80, 6, 3)
+       .fillColor(theme.primaryColor)
+       .fill();
+    doc.restore();
 
     // Body
     if (slide.body) {
       const formattedBody = this.formatBodyText(slide.body);
-      doc.fontSize(36)
+      doc.fontSize(34)
          .fillColor(theme.textColor)
          .font(regularFont)
-         .text(formattedBody, 100, currentY + 60, {
+         .text(formattedBody, 100, currentY + 65, {
            width: 880,
            align: 'left',
-           lineGap: 14
+           lineGap: 16
          });
     }
   }
@@ -226,31 +327,41 @@ export class PdfGeneratorService {
     boldFont: string,
     italicFont: string
   ) {
-    // Large Quotation Mark
-    doc.fontSize(180)
+    // Giant quotation mark in background
+    doc.save();
+    doc.fontSize(320)
        .fillColor(theme.primaryColor)
+       .fillOpacity(0.08)
        .font(boldFont)
-       .text('“', 100, 80, { lineGap: 0 });
+       .text('“', 80, 100, { lineGap: 0 });
+    doc.restore();
 
-    const quoteY = doc.y;
+    // Left vertical border accent for quotes
+    doc.save();
+    doc.roundedRect(100, 280, 8, 400, 4)
+       .fillColor(theme.primaryColor)
+       .fill();
+    doc.restore();
 
     // Quote text (using headline)
-    doc.fontSize(44)
+    doc.fontSize(42)
        .fillColor(theme.textColor)
        .font(italicFont)
-       .text(slide.headline || '', 120, quoteY + 20, {
-         width: 840,
+       .text(slide.headline || '', 140, 310, {
+         width: 800,
          align: 'left',
-         lineGap: 16
+         lineGap: 18
        });
+
+    const quoteEndY = doc.y;
 
     // Quote Author (using body)
     if (slide.body) {
-      doc.fontSize(32)
+      doc.fontSize(30)
          .fillColor(theme.accentColor)
          .font(boldFont)
-         .text(`— ${slide.body}`, 120, doc.y + 35, {
-           width: 840,
+         .text(`— ${slide.body}`, 140, quoteEndY + 35, {
+           width: 800,
            align: 'left'
          });
     }
@@ -263,28 +374,50 @@ export class PdfGeneratorService {
     regularFont: string,
     boldFont: string
   ) {
-    // Center Card background using primary color
-    doc.roundedRect(100, 200, 880, 620, 24).fill(theme.primaryColor);
+    // 1. Draw card shadow (offset dark rectangle)
+    doc.save();
+    doc.roundedRect(104, 204, 880, 620, 24)
+       .fillColor('#000000')
+       .fillOpacity(0.15)
+       .fill();
+    doc.restore();
+
+    // 2. Draw card background using primary color
+    doc.save();
+    doc.roundedRect(100, 200, 880, 620, 24)
+       .fillColor(theme.primaryColor)
+       .fill();
+    doc.restore();
+
+    // Decorative circle inside card
+    doc.save();
+    doc.circle(850, 300, 180)
+       .fillColor('#FFFFFF')
+       .fillOpacity(0.05)
+       .fill();
+    doc.restore();
 
     // Title inside card
-    doc.fontSize(58)
+    doc.fontSize(56)
        .fillColor('#FFFFFF')
        .font(boldFont)
-       .text(slide.headline || '', 150, 280, {
+       .text(slide.headline || '', 150, 290, {
          width: 780,
          align: 'center',
-         lineGap: 15
+         lineGap: 14
        });
 
     const ctaY = doc.y;
 
     // Divider inside card
-    doc.rect(490, ctaY + 30, 100, 4).fill('#FFFFFF');
+    doc.save();
+    doc.rect(490, ctaY + 30, 100, 4).fillColor('#FFFFFF').fillOpacity(0.5).fill();
+    doc.restore();
 
     // Body inside card
     if (slide.body) {
       const formattedBody = this.formatBodyText(slide.body);
-      doc.fontSize(38)
+      doc.fontSize(36)
          .fillColor('#FFFFFF')
          .font(regularFont)
          .text(formattedBody, 150, ctaY + 70, {
@@ -293,6 +426,16 @@ export class PdfGeneratorService {
            lineGap: 12
          });
     }
+    
+    // Bottom Handle Banner
+    doc.fontSize(22)
+       .fillColor('#FFFFFF')
+       .font(boldFont)
+       .text(theme.authorHandle.toUpperCase(), 150, 740, {
+         width: 780,
+         align: 'center',
+         characterSpacing: 1.5
+       });
   }
 
   private static drawFooter(
@@ -307,8 +450,13 @@ export class PdfGeneratorService {
     // Suppress footer on cover
     if (slide.type === 'cover') return;
 
-    // Small footer separator line
-    doc.rect(100, 940, 880, 2).fill(theme.accentColor);
+    // Small footer separator line (subtle)
+    doc.save();
+    doc.rect(100, 940, 880, 1)
+       .fillColor(theme.accentColor)
+       .fillOpacity(0.2)
+       .fill();
+    doc.restore();
 
     // Author Name & Handle (left-aligned)
     doc.fontSize(22)

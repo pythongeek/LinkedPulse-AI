@@ -370,7 +370,44 @@ export class LinkedInPublisher {
 
     // Handle Carousel / PDF Generation
     if (content.contentType === 'carousel' && content.slides) {
-      const slidesList = content.slides as any;
+      let slidesList = content.slides as any;
+      
+      // Safe parsing if slides are stored as a stringified JSON array
+      if (typeof slidesList === 'string') {
+        try {
+          slidesList = JSON.parse(slidesList);
+        } catch (_) {}
+      }
+      
+      // Safe double-parsing if double-stringified
+      if (typeof slidesList === 'string') {
+        try {
+          slidesList = JSON.parse(slidesList);
+        } catch (_) {}
+      }
+
+      // Safe recursive extraction of slides array
+      const findSlidesArray = (obj: any): any[] | null => {
+        if (Array.isArray(obj)) return obj;
+        if (obj && typeof obj === 'object') {
+          // Prioritize specific fields
+          if (Array.isArray(obj.slides)) return obj.slides;
+          if (Array.isArray(obj.slideDeck)) return obj.slideDeck;
+          if (Array.isArray(obj.data)) return obj.data;
+          // Recursively find the first array in other fields
+          for (const key of Object.keys(obj)) {
+            const result = findSlidesArray(obj[key]);
+            if (result) return result;
+          }
+        }
+        return null;
+      };
+
+      const extractedSlides = findSlidesArray(slidesList);
+      if (extractedSlides && extractedSlides.length > 0) {
+        slidesList = extractedSlides;
+      }
+
       if (Array.isArray(slidesList) && slidesList.length > 0) {
         try {
           const defaultTheme = {
