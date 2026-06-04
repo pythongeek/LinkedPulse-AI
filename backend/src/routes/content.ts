@@ -9,17 +9,6 @@ import { logger } from '../utils/logger';
 
 const router = Router();
 
-router.get('/debug/:id', async (req, res) => {
-  try {
-    const record = await prisma.content.findUnique({
-      where: { id: req.params.id },
-    });
-    return res.json({ record });
-  } catch (error: any) {
-    return res.json({ error: error.message });
-  }
-});
-
 /**
  * Generate content
  * POST /api/content/generate

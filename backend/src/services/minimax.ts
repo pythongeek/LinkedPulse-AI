@@ -45,17 +45,6 @@ export class AIClient {
     }
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: this.model,
-        generationConfig: {
-          temperature,
-          maxOutputTokens: maxTokens,
-          ...(options.responseFormat === 'json' && { responseMimeType: 'application/json' }),
-        },
-      });
-
-      // Convert messages: Gemini doesn't have a system role in the same way.
-      // Prepend system message to the first user message.
       let systemPrompt = '';
       const geminiParts: string[] = [];
 
@@ -67,11 +56,18 @@ export class AIClient {
         }
       }
 
-      const combinedPrompt = systemPrompt
-        ? `${systemPrompt}\n\n${geminiParts.join('\n\n')}`
-        : geminiParts.join('\n\n');
+      const model = genAI.getGenerativeModel({
+        model: this.model,
+        systemInstruction: systemPrompt || undefined,
+        generationConfig: {
+          temperature,
+          maxOutputTokens: maxTokens,
+          ...(options.responseFormat === 'json' && { responseMimeType: 'application/json' }),
+        },
+      });
 
-      const result = await model.generateContent(combinedPrompt);
+      const userPrompt = geminiParts.join('\n\n') || 'Please respond.';
+      const result = await model.generateContent(userPrompt);
       return result.response.text();
     } catch (error) {
       logger.error('AI chat error:', error);

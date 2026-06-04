@@ -369,7 +369,7 @@ export class LinkedInPublisher {
     let postUrn = '';
 
     // Handle Carousel / PDF Generation
-    if (content.contentType === 'carousel' && content.slides) {
+    if (content.contentType === 'carousel') {
       let slidesList = content.slides as any;
       
       // Safe parsing if slides are stored as a stringified JSON array
@@ -408,8 +408,11 @@ export class LinkedInPublisher {
         slidesList = extractedSlides;
       }
 
-      if (Array.isArray(slidesList) && slidesList.length > 0) {
-        try {
+      if (!Array.isArray(slidesList) || slidesList.length === 0) {
+        throw new Error('LinkedIn Carousel requires at least one slide. Try generating or recreating the slide content.');
+      }
+
+      try {
           const defaultTheme = {
             primaryColor: '#0284C7',
             backgroundColor: '#F8FAFC',
@@ -445,7 +448,6 @@ export class LinkedInPublisher {
           const errMsg = pdfError.response?.data?.message || pdfError.response?.data?.error?.message || pdfError.message;
           throw new Error(`LinkedIn Carousel Upload Failed: ${errMsg}`);
         }
-      }
     }
 
     if (!postUrn) {

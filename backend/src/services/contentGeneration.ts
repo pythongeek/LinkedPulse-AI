@@ -603,7 +603,7 @@ Return JSON:
       };
     } catch (error) {
       logger.error('Write post agent error:', error);
-      return { title: topic, body: '', content: '', hook: '', hashtags: [], hookFormula: 'bold_claim', charCount: 0, emojiCount: 0, outline: {}, formattedContent: '' };
+      throw error;
     }
   }
 
@@ -675,7 +675,7 @@ Return JSON:
       };
     } catch (error) {
       logger.error('Write carousel agent error:', error);
-      return { title: topic, caption: '', captionHashtags: [], slides: [], firstComment: '', content: '', outline: {}, formattedContent: '' };
+      throw error;
     }
   }
 
@@ -749,7 +749,7 @@ Return JSON:
       };
     } catch (error) {
       logger.error('Write article agent error:', error);
-      return { title: topic, excerpt: '', body: '', content: '', sections: [], coverImagePrompt: '', hashtags: [], readingTimeMinutes: 0, wordCount: 0, articleTitle: topic, outline: {}, formattedContent: '' };
+      throw error;
     }
   }
 
@@ -821,7 +821,7 @@ Return JSON:
       };
     } catch (error) {
       logger.error('Write poll agent error:', error);
-      return { question: topic, options: [], duration: '1_week', introText: '', introHashtags: [], firstComment: '', title: topic, content: '', outline: {}, formattedContent: '' };
+      throw error;
     }
   }
 
