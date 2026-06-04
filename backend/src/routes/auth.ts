@@ -285,7 +285,9 @@ router.post('/linkedin/app-credentials', authenticate, validateBody(linkedinAppC
  * GET /api/auth/linkedin/login
  */
 router.get('/linkedin/login', authenticate, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const userId = req.user!.id;
+  const { scopes } = req.query;
   let clientId = process.env.LINKEDIN_CLIENT_ID;
 
   // Check for custom app credentials
@@ -302,7 +304,14 @@ router.get('/linkedin/login', authenticate, async (req, res) => {
   const protocol = req.protocol === 'http' && host?.includes('localhost') ? 'http' : 'https';
   const backendUrl = process.env.VITE_API_URL || process.env.BACKEND_URL || `${protocol}://${host}`;
   const redirectUri = `${backendUrl}/api/auth/linkedin/callback`;
-  const scope = 'w_member_social w_organization_social r_organization_admin openid profile email';
+  
+  // Default to personal scopes for custom app unless scopes=all is explicitly requested
+  let scopeList = ['openid', 'profile', 'email', 'w_member_social'];
+  const isCustomApp = !!session?.clientId;
+  if (!isCustomApp || scopes === 'all') {
+    scopeList.push('w_organization_social', 'r_organization_admin');
+  }
+  const scope = scopeList.join(' ');
   const state = userId; // Track user
 
   const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${encodeURIComponent(scope)}`;
@@ -320,7 +329,7 @@ router.get('/linkedin/callback', async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://linked-pulse-ai.vercel.app';
 
   if (error) {
-    logger.error('LinkedIn OAuth returned error:', error_description);
+    logger.error(`LinkedIn OAuth returned error: ${error} - ${error_description}`);
     return res.redirect(`${frontendUrl}/settings?linkedin=error`);
   }
 
@@ -423,7 +432,8 @@ router.get('/linkedin/callback', async (req, res) => {
 
     res.redirect(`${frontendUrl}/settings?linkedin=success`);
   } catch (err: any) {
-    logger.error('LinkedIn OAuth error:', err.response?.data || err.message);
+    const errorDetails = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+    logger.error(`LinkedIn OAuth error: ${errorDetails}`);
     res.redirect(`${frontendUrl}/settings?linkedin=error`);
   }
 });

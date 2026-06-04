@@ -22,6 +22,7 @@ export default function Settings() {
   const [copied, setCopied] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<string>('personal');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [includeOrgScopes, setIncludeOrgScopes] = useState(false);
 
   const redirectUri = `${import.meta.env.VITE_API_URL || window.location.origin}/api/auth/linkedin/callback`;
 
@@ -147,7 +148,7 @@ export default function Settings() {
   const handleConnectOAuth = async () => {
     setLoadingOAuth(true);
     try {
-      const response = await linkedinApi.getOAuthUrl();
+      const response = await linkedinApi.getOAuthUrl(includeOrgScopes ? 'all' : 'personal');
       if (response.data?.url) {
         window.location.href = response.data.url;
       } else {
@@ -268,18 +269,35 @@ export default function Settings() {
                   </Button>
                 </div>
               ) : (
-                <Button
-                  onClick={handleConnectOAuth}
-                  disabled={loadingOAuth}
-                  className="w-full bg-[#0a66c2] hover:bg-[#004182] text-white text-xs h-9 font-medium shadow-sm transition-all duration-200"
-                >
-                  {loadingOAuth ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Linkedin className="mr-2 h-4 w-4" />
+                <div className="space-y-4 w-full">
+                  {linkedinStatus?.hasCustomApp && (
+                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                      <input
+                        id="include-org-scopes"
+                        type="checkbox"
+                        checked={includeOrgScopes}
+                        onChange={(e) => setIncludeOrgScopes(e.target.checked)}
+                        className="mt-1 h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <label htmlFor="include-org-scopes" className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight cursor-pointer select-none">
+                        <span className="font-semibold block text-slate-700 dark:text-slate-300">Publish to Company Pages</span>
+                        Requires the <b>Community Management API</b> approved on your custom LinkedIn App. Uncheck for Personal Profile posting only (recommended).
+                      </label>
+                    </div>
                   )}
-                  Connect LinkedIn OAuth
-                </Button>
+                  <Button
+                    onClick={handleConnectOAuth}
+                    disabled={loadingOAuth}
+                    className="w-full bg-[#0a66c2] hover:bg-[#004182] text-white text-xs h-9 font-medium shadow-sm transition-all duration-200"
+                  >
+                    {loadingOAuth ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Linkedin className="mr-2 h-4 w-4" />
+                    )}
+                    Connect LinkedIn OAuth
+                  </Button>
+                </div>
               )}
             </div>
           </div>

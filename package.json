@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "prisma db push --schema=./backend/prisma/schema.prisma --accept-data-loss && tsc -b && vite build",
+    "build": "prisma generate --schema=./backend/prisma/schema.prisma && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "db:migrate": "prisma migrate deploy --schema=./backend/prisma/schema.prisma",

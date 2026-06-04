@@ -25,7 +25,9 @@ export class AIClient {
   private model: string;
 
   constructor() {
-    this.model = GEMINI_MODEL;
+    // Automatically map legacy 'gemini-pro' (1.0 Pro) to 'gemini-2.5-flash'
+    // for native JSON mode support and larger output limits.
+    this.model = GEMINI_MODEL === 'gemini-pro' ? 'gemini-2.5-flash' : GEMINI_MODEL;
   }
 
   /**
@@ -78,6 +80,81 @@ export class AIClient {
   }
 
   /**
+   * Helper to repair truncated or slightly malformed JSON responses by balancing braces and quotes.
+   */
+  private repairJSON(json: string): string {
+    try {
+      JSON.parse(json);
+      return json;
+    } catch (_) {
+      // Continue to repair
+    }
+
+    let repaired = json.trim();
+
+    // Remove potential markdown fence artifacts if present
+    if (repaired.startsWith('```json')) {
+      repaired = repaired.substring(7);
+    } else if (repaired.startsWith('```')) {
+      repaired = repaired.substring(3);
+    }
+    if (repaired.endsWith('```')) {
+      repaired = repaired.substring(0, repaired.length - 3);
+    }
+    repaired = repaired.trim();
+
+    let inString = false;
+    let escape = false;
+    const stack: string[] = [];
+
+    for (let i = 0; i < repaired.length; i++) {
+      const char = repaired[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (char === '\\') {
+        escape = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === '{' || char === '[') {
+          stack.push(char);
+        } else if (char === '}') {
+          if (stack[stack.length - 1] === '{') {
+            stack.pop();
+          }
+        } else if (char === ']') {
+          if (stack[stack.length - 1] === '[') {
+            stack.pop();
+          }
+        }
+      }
+    }
+
+    // If we ended inside a string value, close the string
+    if (inString) {
+      repaired += '"';
+    }
+
+    // Close any open braces or brackets
+    while (stack.length > 0) {
+      const open = stack.pop();
+      if (open === '{') {
+        repaired += '}';
+      } else if (open === '[') {
+        repaired += ']';
+      }
+    }
+
+    return repaired;
+  }
+
+  /**
    * Generate JSON response — parses JSON from AI output
    */
   async chatJSON<T = any>(
@@ -98,17 +175,16 @@ export class AIClient {
     }
     cleanText = cleanText.trim();
 
-    // Extract JSON from response
+    // First try: exact matches
     const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[0]);
       } catch {
-        logger.warn('Failed to parse AI JSON response, trying array match');
+        logger.warn('Failed to parse AI JSON response directly, attempting repair');
       }
     }
 
-    // Try array match
     const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
     if (arrayMatch) {
       try {
@@ -116,6 +192,17 @@ export class AIClient {
       } catch {
         // fall through
       }
+    }
+
+    // Second try: repair truncated JSON
+    try {
+      const repaired = this.repairJSON(cleanText);
+      const repairedMatch = repaired.match(/\{[\s\S]*\}/) || repaired.match(/\[[\s\S]*\]/);
+      if (repairedMatch) {
+        return JSON.parse(repairedMatch[0]);
+      }
+    } catch (repairError) {
+      logger.error('Failed to parse repaired JSON:', repairError);
     }
 
     throw new Error('AI did not return valid JSON');
