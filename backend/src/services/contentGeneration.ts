@@ -273,9 +273,7 @@ export class ContentGenerationService {
         const promptEngine = new LinkedInImagePromptEngine();
 
         // Determine correct LinkedIn image purpose based on content type
-        const imagePurpose = options.contentType === 'carousel' ? 'carousel_cover'
-          : options.contentType === 'article' ? 'article_cover'
-          : 'feed_post';
+        const imagePurpose = LinkedInImagePromptEngine.contentTypeToPurpose(options.contentType);
 
         // Build structured prompt with persona DNA + hook formula
         const structuredPrompt = promptEngine.buildPrompt(

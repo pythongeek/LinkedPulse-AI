@@ -216,7 +216,7 @@ export class ImageGenerationService {
         '1.91:1': { width: 1200, height: 627 },
         '1:1':    { width: 1080, height: 1080 },
         '4:1':    { width: 1584, height: 396 },
-        '16:9':   { width: 1200, height: 627 },
+        '16:9':   { width: 1920, height: 1080 },
         '4:3':    { width: 1024, height: 768 },
         '9:16':   { width: 627,  height: 1200 },
       };
