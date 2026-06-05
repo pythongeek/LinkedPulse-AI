@@ -133,6 +133,18 @@ export default function ContentStudio() {
   const [scheduleDate, setScheduleDate] = useState<Date>();
   const [scheduleTime, setScheduleTime] = useState('10:00');
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isSuggestingSchedule, setIsSuggestingSchedule] = useState(false);
+  const [isUnscheduling, setIsUnscheduling] = useState(false);
+
+  useEffect(() => {
+    if (generatedContent?.scheduledFor) {
+      const date = new Date(generatedContent.scheduledFor);
+      setScheduleDate(date);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      setScheduleTime(`${hours}:${minutes}`);
+    }
+  }, [generatedContent?.scheduledFor]);
 
   const { data: linkedinStatus } = useQuery({
     queryKey: ['linkedinStatus'],
@@ -317,6 +329,53 @@ export default function ContentStudio() {
       toast.error(error.response?.data?.error?.message || 'Failed to schedule post');
     } finally {
       setIsScheduling(false);
+    }
+  };
+
+  const handleUnschedule = async () => {
+    if (!generatedContent?.id) {
+      toast.error('No content ID found');
+      return;
+    }
+    
+    setIsUnscheduling(true);
+    try {
+      await contentApi.unschedule(generatedContent.id);
+      toast.success('Successfully unscheduled post!');
+      setGeneratedContent({ 
+        ...generatedContent, 
+        status: 'draft', 
+        scheduledFor: null
+      });
+      setScheduleDate(undefined);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to unschedule post');
+    } finally {
+      setIsUnscheduling(false);
+    }
+  };
+
+  const handleAiSuggestSchedule = async () => {
+    if (!generatedContent?.id) {
+      toast.error('No content ID found');
+      return;
+    }
+    
+    setIsSuggestingSchedule(true);
+    try {
+      const res = await contentApi.suggestSchedule(generatedContent.id);
+      const suggestedTime = new Date(res.data.suggestedTime);
+      setScheduleDate(suggestedTime);
+      
+      const hours = String(suggestedTime.getHours()).padStart(2, '0');
+      const minutes = String(suggestedTime.getMinutes()).padStart(2, '0');
+      setScheduleTime(`${hours}:${minutes}`);
+      
+      toast.success(`AI Recommendation applied: ${res.data.reasoning}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to get AI recommendation');
+    } finally {
+      setIsSuggestingSchedule(false);
     }
   };
 
@@ -1031,7 +1090,7 @@ export default function ContentStudio() {
                               </Button>
                               <Popover>
                                 <PopoverTrigger asChild>
-                                  <Button variant="outline" className="h-10 px-3 bg-secondary text-foreground hover:bg-secondary/80 border-white/10" disabled={generatedContent.status === 'published' || generatedContent.status === 'scheduled'}>
+                                  <Button variant="outline" className="h-10 px-3 bg-secondary text-foreground hover:bg-secondary/80 border-white/10" disabled={generatedContent.status === 'published'}>
                                     <Clock className="h-4 w-4 mr-2" />
                                     {generatedContent.status === 'scheduled' ? 'Scheduled ✓' : 'Schedule'}
                                   </Button>
@@ -1039,6 +1098,22 @@ export default function ContentStudio() {
                                 <PopoverContent className="w-auto p-4 bg-card border-border shadow-2xl">
                                   <div className="space-y-4">
                                     <h4 className="font-bold text-sm">Schedule Post</h4>
+                                    
+                                    {generatedContent.bestPostingTime && (
+                                      <div className="p-2 rounded bg-indigo-950/30 border border-indigo-500/10 text-xs text-indigo-200/90 space-y-1">
+                                        <div className="font-medium">💡 AI Recommended Posting Time:</div>
+                                        <div className="text-[11px] text-muted-foreground">{generatedContent.bestPostingTime}</div>
+                                        <Button 
+                                          onClick={handleAiSuggestSchedule} 
+                                          disabled={isSuggestingSchedule} 
+                                          variant="link" 
+                                          className="h-auto p-0 text-[10px] text-indigo-400 hover:text-indigo-300 font-bold"
+                                        >
+                                          {isSuggestingSchedule ? 'Auto-Scheduling...' : 'Apply AI Recommendation'}
+                                        </Button>
+                                      </div>
+                                    )}
+
                                     <Calendar
                                       mode="single"
                                       selected={scheduleDate}
@@ -1046,19 +1121,32 @@ export default function ContentStudio() {
                                       className="rounded-md border border-white/5"
                                       disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                                     />
+                                    
                                     <div className="flex items-center gap-2">
                                       <Label htmlFor="time" className="text-xs">Time</Label>
+                                      <span className="text-[10px] text-muted-foreground ml-auto">({Intl.DateTimeFormat().resolvedOptions().timeZone})</span>
                                       <Input
                                         id="time"
                                         type="time"
                                         value={scheduleTime}
                                         onChange={(e) => setScheduleTime(e.target.value)}
-                                        className="h-8 text-sm"
+                                        className="h-8 text-sm w-24"
                                       />
                                     </div>
+                                    
                                     <Button onClick={handleSchedule} disabled={!scheduleDate || isScheduling} className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700">
-                                      {isScheduling ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : 'Confirm Schedule'}
+                                      {isScheduling ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : generatedContent.status === 'scheduled' ? 'Update Schedule' : 'Confirm Schedule'}
                                     </Button>
+
+                                    {generatedContent.status === 'scheduled' && (
+                                      <Button 
+                                        onClick={handleUnschedule} 
+                                        disabled={isUnscheduling} 
+                                        className="w-full h-8 text-xs bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/20"
+                                      >
+                                        {isUnscheduling ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : 'Unschedule Post'}
+                                      </Button>
+                                    )}
                                   </div>
                                 </PopoverContent>
                               </Popover>

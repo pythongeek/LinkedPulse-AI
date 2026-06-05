@@ -2,6 +2,8 @@ import axios from 'axios';
 import { logger } from '../utils/logger';
 import { PdfGeneratorService } from './pdfGenerator';
 
+const LINKEDIN_API_VERSION = '202605';
+
 export class LinkedInPublisher {
   /**
    * Fetch the author's URN from the /v2/me endpoint
@@ -52,7 +54,7 @@ export class LinkedInPublisher {
       const response = await axios.post('https://api.linkedin.com/rest/posts', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202605',
+          'LinkedIn-Version': LINKEDIN_API_VERSION,
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
@@ -92,7 +94,7 @@ export class LinkedInPublisher {
       const response = await axios.post(url, payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202605',
+          'LinkedIn-Version': LINKEDIN_API_VERSION,
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
@@ -122,7 +124,7 @@ export class LinkedInPublisher {
       const response = await axios.post('https://api.linkedin.com/rest/images?action=initializeUpload', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202605',
+          'LinkedIn-Version': LINKEDIN_API_VERSION,
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
@@ -143,10 +145,25 @@ export class LinkedInPublisher {
    */
   static async uploadImageBinary(uploadUrl: string, imageBuffer: Buffer, accessToken: string): Promise<void> {
     try {
+      let contentType = 'image/jpeg';
+      if (imageBuffer.length >= 4) {
+        if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50 && imageBuffer[2] === 0x4E && imageBuffer[3] === 0x47) {
+          contentType = 'image/png';
+        } else if (imageBuffer[0] === 0x47 && imageBuffer[1] === 0x49 && imageBuffer[2] === 0x46 && imageBuffer[3] === 0x38) {
+          contentType = 'image/gif';
+        } else if (
+          imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49 && imageBuffer[2] === 0x46 && imageBuffer[3] === 0x46 &&
+          imageBuffer.length >= 12 &&
+          imageBuffer[8] === 0x57 && imageBuffer[9] === 0x45 && imageBuffer[10] === 0x42 && imageBuffer[11] === 0x50
+        ) {
+          contentType = 'image/webp';
+        }
+      }
+
       await axios.put(uploadUrl, imageBuffer, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'image/jpeg',
+          'Content-Type': contentType,
         },
       });
     } catch (error: any) {
@@ -180,7 +197,7 @@ export class LinkedInPublisher {
       const response = await axios.post('https://api.linkedin.com/rest/posts', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202605',
+          'LinkedIn-Version': LINKEDIN_API_VERSION,
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
@@ -210,7 +227,7 @@ export class LinkedInPublisher {
       const response = await axios.post('https://api.linkedin.com/rest/documents?action=initializeUpload', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202605',
+          'LinkedIn-Version': LINKEDIN_API_VERSION,
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
@@ -233,6 +250,7 @@ export class LinkedInPublisher {
     try {
       await axios.put(uploadUrl, documentBuffer, {
         headers: {
+          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/pdf',
         },
       });
@@ -260,7 +278,7 @@ export class LinkedInPublisher {
           const statusResponse = await axios.get(`https://api.linkedin.com/rest/documents/${encodeURIComponent(assetUrn)}`, {
             headers: {
               Authorization: `Bearer ${accessToken}`,
-              'LinkedIn-Version': '202605',
+              'LinkedIn-Version': LINKEDIN_API_VERSION,
               'X-Restli-Protocol-Version': '2.0.0',
             }
           });
@@ -298,7 +316,7 @@ export class LinkedInPublisher {
       const response = await axios.post('https://api.linkedin.com/rest/posts', payload, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202605',
+          'LinkedIn-Version': LINKEDIN_API_VERSION,
           'X-Restli-Protocol-Version': '2.0.0',
           'Content-Type': 'application/json',
         },
@@ -322,6 +340,8 @@ export class LinkedInPublisher {
   static cleanMarkdownForLinkedIn(text: string): string {
     if (!text) return '';
     return text
+      // Replace markdown links [text](url) with just text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
       // Replace markdown bold **text** or __text__ with text
       .replace(/\*\*([^*]+)\*\*/g, '$1')
       .replace(/__([^_]+)__/g, '$1')
@@ -330,6 +350,12 @@ export class LinkedInPublisher {
       .replace(/_([^_]+)_/g, '$1')
       // Replace inline code `code` with code
       .replace(/`([^`]+)`/g, '$1')
+      // Strip triple backticks (code blocks)
+      .replace(/```[a-zA-Z0-9-]*\r?\n?/g, '')
+      // Remove horizontal rules
+      .replace(/^[ \t]*(?:---|\*\*\*|___)\s*$/gm, '')
+      // Strip basic HTML tags
+      .replace(/<[^>]+>/g, '')
       // Replace markdown headers (e.g. "# Header") with just the text
       .replace(/^[ \t]*#{1,6}\s+([^\n]+)/gm, '$1')
       // Replace blockquotes (e.g., "> Text") with just the text
@@ -504,7 +530,7 @@ export class LinkedInPublisher {
       const aclResponse = await axios.get('https://api.linkedin.com/rest/organizationAcls?q=roleAssignee', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202605',
+          'LinkedIn-Version': LINKEDIN_API_VERSION,
           'X-Restli-Protocol-Version': '2.0.0',
         },
       });
@@ -524,7 +550,7 @@ export class LinkedInPublisher {
       const orgResponse = await axios.get(`https://api.linkedin.com/rest/organizations?ids=List(${idsParam})`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202605',
+          'LinkedIn-Version': LINKEDIN_API_VERSION,
           'X-Restli-Protocol-Version': '2.0.0',
         },
       });

@@ -356,56 +356,6 @@ export class ContentGenerationService {
   // ==================== AGENTS ====================
 
   /**
-   * Research Agent — Gemini (Google Search Grounding)
-   */
-  private async researchAgent(topic: string, depth: 'none' | 'quick' | 'deep'): Promise<any> {
-    try {
-      const modelConfig: any = { 
-        model: 'gemini-2.5-flash'
-      };
-      if (depth !== 'none') {
-        modelConfig.tools = [{ googleSearch: {} } as any];
-      }
-      const model = genAI.getGenerativeModel(modelConfig);
-
-      const prompt = `Research the topic: "${topic}" thoroughly for LinkedIn content. Search Google to get live, up-to-date facts, statistics, B2B trends, and expert comments.
-      
-Tasks:
-1. Find latest statistics and data (2024-2026 preferred, with sources)
-2. Identify expert opinions and thought leaders
-3. Locate case studies with numbers
-4. Find relevant research papers
-5. Identify common misconceptions
-6. Find trending subtopics
-
-${depth === 'deep' ? 'Provide comprehensive research with 15+ sources.' : 'Provide key insights with 7-10 sources.'}
-
-Return JSON format:
-{
-  "statistics": [{"fact": "...", "value": "...", "source": "..."}],
-  "expertOpinions": [{"expert": "...", "opinion": "..."}],
-  "caseStudies": [{"company": "...", "results": "..."}],
-  "keyInsights": ["..."],
-  "subtopics": ["..."],
-  "sources": [{"title": "...", "url": "...", "credibility": "high/medium/low"}]
-}`;
-
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) return JSON.parse(jsonMatch[0]);
-      return this.getEmptyResearch();
-    } catch (error) {
-      logger.error('Research agent error:', error);
-      return this.getEmptyResearch();
-    }
-  }
-
-  private getEmptyResearch() {
-    return { statistics: [], expertOpinions: [], caseStudies: [], keyInsights: [], subtopics: [], sources: [] };
-  }
-
-  /**
    * Trend Agent — MiniMax (content strategy)
    */
   private async trendAgent(topic: string): Promise<any> {
@@ -965,42 +915,7 @@ Return ONLY the first comment text, nothing else.`,
     }
   }
 
-  /**
-   * Visual Agent — Gemini (image/visual tasks)
-   */
-  private async visualAgent(topic: string, content: string, persona?: Persona | null): Promise<string[]> {
-    try {
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash',
-        generationConfig: { responseMimeType: 'application/json' }
-      });
 
-      const visualDNA = persona?.visualDNA as any;
-      const visualStyle = visualDNA?.style ? `Style: ${visualDNA.style}, Colors: ${visualDNA.colorScheme}` : 'Professional, clean LinkedIn imagery';
-
-      const prompt = `Create 3 image generation prompts for a LinkedIn post about "${topic}"
-
-Content summary: ${content.substring(0, 300)}
-Visual style: ${visualStyle}
-
-Return JSON:
-{
-  "prompts": ["Prompt 1...", "Prompt 2...", "Prompt 3..."]
-}`;
-
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return parsed.prompts || [];
-      }
-      return [`Professional illustration for ${topic}`];
-    } catch (error) {
-      logger.error('Visual agent error:', error);
-      return [`${topic} illustration`];
-    }
-  }
 
   /**
    * Timing Agent — MiniMax
@@ -1024,31 +939,7 @@ Return JSON:
     }
   }
 
-  /**
-   * Engagement Predictor — MiniMax
-   */
-  private async engagementPredictorAgent(content: string, contentType: string, hookSuggestions: string[]): Promise<any> {
-    try {
-      return await this.minimax.promptJSON(
-        'You are a LinkedIn engagement prediction expert.',
-        `Predict engagement for this ${contentType}:
 
-Preview: ${content.substring(0, 300)}
-Hooks: ${hookSuggestions.slice(0, 3).join(' | ')}
-
-Return JSON:
-{
-  "score": 0-100,
-  "strengths": ["..."],
-  "weaknesses": ["..."],
-  "predictedImpressions": "..."
-}`
-      );
-    } catch (error) {
-      logger.error('Engagement predictor error:', error);
-      return { score: 50, strengths: [], weaknesses: [] };
-    }
-  }
 
   // ==================== HELPERS ====================
 
@@ -1076,15 +967,24 @@ Return JSON:
             text: opt.text?.substring(0, LINKEDIN_LIMITS.poll.optionMaxChars) || opt.text,
           }));
         }
+        if (output.introText && output.introText.length > LINKEDIN_LIMITS.poll.introMaxChars) {
+          output.introText = this.truncateAtSentence(output.introText, LINKEDIN_LIMITS.poll.introMaxChars);
+        }
         break;
       }
       case 'carousel': {
+        if (output.caption && output.caption.length > LINKEDIN_LIMITS.carousel.maxCaptionChars) {
+          output.caption = this.truncateAtSentence(output.caption, LINKEDIN_LIMITS.carousel.maxCaptionChars);
+        }
         if (output.slides && Array.isArray(output.slides)) {
           output.slides = output.slides.map((slide: any) => ({
             ...slide,
             headline: slide.headline?.length > LINKEDIN_LIMITS.carousel.headlineMaxChars
               ? slide.headline.substring(0, LINKEDIN_LIMITS.carousel.headlineMaxChars)
               : slide.headline,
+            body: slide.body?.length > LINKEDIN_LIMITS.carousel.bodyMaxChars
+              ? slide.body.substring(0, LINKEDIN_LIMITS.carousel.bodyMaxChars - 3) + '...'
+              : slide.body,
           }));
         }
         break;
@@ -1096,6 +996,9 @@ Return JSON:
         }
         if (output.excerpt && output.excerpt.length > LINKEDIN_LIMITS.article.excerptMaxChars) {
           output.excerpt = this.truncateAtSentence(output.excerpt, LINKEDIN_LIMITS.article.excerptMaxChars);
+        }
+        if (output.body && output.body.length > LINKEDIN_LIMITS.article.maxChars) {
+          output.body = this.truncateAtSentence(output.body, LINKEDIN_LIMITS.article.maxChars);
         }
         break;
       }

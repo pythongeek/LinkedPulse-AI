@@ -17,5 +17,11 @@
       "maxDuration": 300,
       "includeFiles": "backend/src/assets/fonts/**"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/tick",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

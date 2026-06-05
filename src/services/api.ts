@@ -46,6 +46,8 @@ export const contentApi = {
   delete: (id: string) => api.delete(`/content/${id}`),
   getSuggestions: (data: any) => api.post('/content/suggestions', data),
   publish: (id: string) => api.post(`/content/${id}/publish`),
+  unschedule: (id: string) => api.post(`/content/${id}/unschedule`),
+  suggestSchedule: (id: string) => api.post(`/content/${id}/suggest-schedule`),
   regenerateImage: (id: string, data?: any) => api.post(`/content/${id}/image/regenerate`, data),
   generateTopicCluster: (data: { context: string; feedback?: string; previousTopics?: any[] }) =>
     api.post('/content/topic-cluster', data),

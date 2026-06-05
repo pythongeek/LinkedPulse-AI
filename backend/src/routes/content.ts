@@ -415,12 +415,49 @@ router.post('/:id/publish', authenticate, async (req, res) => {
       });
     }
 
+    // Duplicate publish prevention
+    if (content.status === 'published') {
+      return res.status(400).json({
+        error: {
+          message: 'This content has already been published to LinkedIn.',
+          code: 'DUPLICATE_PUBLISH',
+        },
+      });
+    }
+
+    // Empty body validation
+    if (content.contentType !== 'carousel') {
+      let checkText = content.body || '';
+      if (content.contentType === 'poll' && content.pollQuestion) {
+        checkText = content.pollQuestion;
+      }
+      if (!checkText.trim()) {
+        return res.status(400).json({
+          error: {
+            message: 'Content body or poll question cannot be empty.',
+            code: 'EMPTY_BODY',
+          },
+        });
+      }
+    }
+
     // 1. Try to get token from DB (if OAuth is implemented)
     // 2. Fall back to environment variable for single-tenant / admin setup
     let accessToken = process.env.LINKEDIN_ACCESS_TOKEN;
     
     // We check the DB for an OAuth token
     const session = await prisma.linkedInSession.findUnique({ where: { userId } });
+
+    // Token expiry check
+    if (session && session.expiresAt && new Date(session.expiresAt) < new Date()) {
+      return res.status(401).json({
+        error: {
+          message: 'Your LinkedIn credentials have expired. Please reconnect your account.',
+          code: 'LINKEDIN_TOKEN_EXPIRED',
+        },
+      });
+    }
+
     if (session && session.accessToken) {
        accessToken = session.accessToken;
     }
@@ -447,6 +484,7 @@ router.post('/:id/publish', authenticate, async (req, res) => {
       data: {
         status: 'published',
         publishedAt: new Date(),
+        publishedUrn: postUrn,
       },
     });
 
@@ -592,17 +630,54 @@ router.post('/schedule-cluster', authenticate, async (req, res) => {
     const jobIds: string[] = [];
     const now = new Date();
 
+    // AI cluster scheduling
+    let scheduledTimes: string[] = [];
+    if (schedule) {
+      try {
+        const { MiniMaxClient } = await import('../services/minimax.js');
+        const aiClient = new MiniMaxClient();
+        const systemPrompt = `You are a B2B LinkedIn scheduler. You will receive a list of content topics/keywords and need to schedule them.
+Guidelines:
+1. Space posts by 1 to 2 days (i.e. staggered).
+2. Avoid scheduling on weekends (Saturday and Sunday) as B2B engagement is lower.
+3. Schedule for peak engagement windows (typically mornings, e.g., 8:00 AM to 11:00 AM in the recipient's timezone, or B2B peak hours).
+4. Reference current time: ${now.toISOString()} (UTC). Stagger starts from tomorrow.
+Output must be a JSON object containing a "schedule" array, where each element corresponds to the index of the topic and provides its scheduled date/time:
+{
+  "schedule": [
+    { "index": 0, "scheduledFor": "ISO 8601 UTC string" }
+  ]
+}
+Return EXACTLY one schedule item per input topic.`;
+
+        const userPrompt = `Please schedule the following topics:\n${topics.map((t, idx) => `${idx}: Keyword "${t.keyword}", Target "${t.targetAudience || 'B2B'}"`).join('\n')}`;
+        
+        const result = await aiClient.promptJSON<{ schedule: Array<{ index: number; scheduledFor: string }> }>(systemPrompt, userPrompt);
+        
+        if (result && Array.isArray(result.schedule)) {
+          const sortedSchedule = [...result.schedule].sort((a, b) => a.index - b.index);
+          scheduledTimes = sortedSchedule.map(s => s.scheduledFor);
+        }
+      } catch (aiErr) {
+        logger.error('Failed to get AI-optimized stagger schedule, falling back to simple stagger:', aiErr);
+      }
+    }
+
     for (let i = 0; i < topics.length; i++) {
       const topic = topics[i];
       
-      // Stagger schedule by i + 1 days starting tomorrow if schedule is true
       let scheduledFor: string | undefined = undefined;
       if (schedule) {
-        const date = new Date(now);
-        date.setDate(now.getDate() + (i + 1));
-        // Default to 10:00 AM
-        date.setHours(10, 0, 0, 0);
-        scheduledFor = date.toISOString();
+        if (scheduledTimes[i]) {
+          scheduledFor = scheduledTimes[i];
+        } else {
+          // Stagger schedule by i + 1 days starting tomorrow if schedule is true
+          const date = new Date(now);
+          date.setUTCDate(now.getUTCDate() + (i + 1));
+          // Default to 10:00 AM UTC
+          date.setUTCHours(10, 0, 0, 0);
+          scheduledFor = date.toISOString();
+        }
       }
 
       // Enqueue job
@@ -661,6 +736,100 @@ router.post('/cluster-additional', authenticate, async (req, res) => {
       error: {
         message: error.message || 'Failed to process request',
         code: 'ADDITIONAL_ERROR',
+      },
+    });
+  }
+});
+
+/**
+ * Unschedule content (revert from scheduled to draft)
+ * POST /api/content/:id/unschedule
+ */
+router.post('/:id/unschedule', authenticate, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    const userId = req.user!.id;
+
+    const content = await prisma.content.findFirst({
+      where: { id, userId },
+    });
+
+    if (!content) {
+      return res.status(404).json({
+        error: { message: 'Content not found', code: 'NOT_FOUND' },
+      });
+    }
+
+    const updatedContent = await prisma.content.update({
+      where: { id },
+      data: {
+        status: 'draft',
+        scheduledFor: null,
+      },
+    });
+
+    logger.info(`Content unscheduled: ${id}`);
+
+    res.json({
+      message: 'Successfully unscheduled content',
+      content: updatedContent,
+    });
+  } catch (error: any) {
+    logger.error('Unschedule content error:', error);
+    res.status(500).json({
+      error: {
+        message: error.message || 'Failed to unschedule content',
+        code: 'UNSCHEDULE_ERROR',
+      },
+    });
+  }
+});
+
+/**
+ * Suggest optimal scheduling time based on AI analysis of bestPostingTime
+ * POST /api/content/:id/suggest-schedule
+ */
+router.post('/:id/suggest-schedule', authenticate, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    const userId = req.user!.id;
+
+    const content = await prisma.content.findFirst({
+      where: { id, userId },
+    });
+
+    if (!content) {
+      return res.status(404).json({
+        error: { message: 'Content not found', code: 'NOT_FOUND' },
+      });
+    }
+
+    const bestPostingTimeStr = content.bestPostingTime || 'Wednesday 9:00 AM EST';
+    
+    const { MiniMaxClient } = await import('../services/minimax.js');
+    const aiClient = new MiniMaxClient();
+
+    const systemPrompt = `You are an AI assistant for a scheduling system. 
+Your job is to parse a text description of a preferred posting time (e.g. "Tuesday 9:00 AM EST" or "Weekdays 8-10 AM") and map it to the next upcoming matching date and time.
+Current Time reference: ${new Date().toISOString()} (ISO UTC).
+Output must be a JSON object with:
+{
+  "suggestedTime": "ISO 8601 string of the exact date and time, converted to UTC",
+  "reasoning": "Brief explanation of how the time matches the prompt and reference time"
+}
+Ensure the suggestedTime is in the future. If the reference time has already passed today's window, schedule for the next week's occurrence.`;
+
+    const userPrompt = `Please parse this preferred posting time description: "${bestPostingTimeStr}".`;
+
+    const result = await aiClient.promptJSON<{ suggestedTime: string; reasoning: string }>(systemPrompt, userPrompt);
+
+    res.json(result);
+  } catch (error: any) {
+    logger.error('Suggest schedule error:', error);
+    res.status(500).json({
+      error: {
+        message: error.message || 'Failed to suggest schedule',
+        code: 'SUGGEST_SCHEDULE_ERROR',
       },
     });
   }

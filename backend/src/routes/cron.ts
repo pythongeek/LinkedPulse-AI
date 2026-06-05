@@ -49,9 +49,9 @@ router.get('/tick', async (req, res) => {
         try {
           const userId = content.userId;
 
-          // Enforce 5 posts per day limit
+          // Enforce 5 posts per day limit (UTC consistently)
           const startOfDay = new Date();
-          startOfDay.setHours(0, 0, 0, 0);
+          startOfDay.setUTCHours(0, 0, 0, 0);
           
           const publishedTodayCount = await prisma.content.count({
             where: {
@@ -64,7 +64,7 @@ router.get('/tick', async (req, res) => {
           if (publishedTodayCount >= 5) {
             logger.warn(`User ${userId} has reached the 5 posts/day limit. Rescheduling post ${content.id} for tomorrow.`);
             const tomorrow = new Date(content.scheduledFor!);
-            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
             await prisma.content.update({
               where: { id: content.id },
               data: { scheduledFor: tomorrow }
@@ -101,8 +101,44 @@ router.get('/tick', async (req, res) => {
             },
           });
           logger.info(`Successfully auto-published scheduled content ${content.id} (URN: ${postUrn})`);
-        } catch (publishErr) {
+        } catch (publishErr: any) {
           logger.error(`Failed to auto-publish content ${content.id}:`, publishErr);
+
+          const opt = (content.linkedinOptimization || {}) as any;
+          const attempts = (opt.publishAttempts || 0) + 1;
+          const errMsg = publishErr instanceof Error ? publishErr.message : String(publishErr);
+
+          if (attempts >= 3) {
+            // Permanent failure after 3 attempts
+            await prisma.content.update({
+              where: { id: content.id },
+              data: {
+                status: 'failed',
+                linkedinOptimization: {
+                  ...opt,
+                  publishAttempts: attempts,
+                  publishError: errMsg,
+                },
+              },
+            });
+            logger.error(`Scheduled post ${content.id} failed permanently after 3 attempts. Error: ${errMsg}`);
+          } else {
+            // Reschedule for 15 minutes later
+            const nextTry = new Date();
+            nextTry.setUTCMinutes(nextTry.getUTCMinutes() + 15);
+            await prisma.content.update({
+              where: { id: content.id },
+              data: {
+                scheduledFor: nextTry,
+                linkedinOptimization: {
+                  ...opt,
+                  publishAttempts: attempts,
+                  publishError: errMsg,
+                },
+              },
+            });
+            logger.info(`Rescheduled post ${content.id} for retry ${attempts + 1} at ${nextTry.toISOString()}`);
+          }
         }
       }
     } catch (schedErr) {
