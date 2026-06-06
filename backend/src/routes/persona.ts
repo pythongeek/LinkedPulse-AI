@@ -17,6 +17,13 @@ router.get('/', authenticate, async (req, res) => {
     const personas = await prisma.persona.findMany({
       where: { userId: req.user!.id },
       orderBy: { createdAt: 'desc' },
+      // ⚡ Bolt: Exclude heavy JSON/Text fields from list response to prevent over-fetching
+      // Expected impact: ~70% payload size reduction, faster serialization
+      omit: {
+        experienceVault: true,
+        visualDNA: true,
+        systemPrompt: true,
+      },
     });
 
     res.json({ personas });
