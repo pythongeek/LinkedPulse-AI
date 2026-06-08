@@ -226,6 +226,13 @@ router.get('/opportunities', authenticate, async (req, res) => {
       },
       orderBy: { opportunityScore: 'desc' },
       take: parseInt(limit as string),
+      // ⚡ Bolt: Prevent over-fetching large JSON blobs in list endpoints
+      omit: {
+        trendData: true,
+        competitionData: true,
+        linkedinData: true,
+        contentAngleMap: true,
+      },
     });
 
     res.json({ topics });
