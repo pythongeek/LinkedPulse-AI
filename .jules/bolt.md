@@ -1,0 +1,3 @@
+## 2024-06-09 - Prisma Over-Fetching in List Endpoints
+**Learning:** The Prisma `Content` and `Topic` models contain large JSON data fields such as `researchData`, `linkedinOptimization`, and `trendData`. In endpoints like `GET /` for Content and `GET /opportunities` for Trends, these massive fields were being pulled into Node's memory on every single row when using `findMany`. This leads to significant performance degradation on list queries.
+**Action:** Always use the `omit` configuration (available natively in Prisma ^6.2.1) in `findMany` queries for list endpoints to prevent over-fetching these large JSON fields.
