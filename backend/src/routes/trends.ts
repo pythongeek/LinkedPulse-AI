@@ -226,6 +226,16 @@ router.get('/opportunities', authenticate, async (req, res) => {
       },
       orderBy: { opportunityScore: 'desc' },
       take: parseInt(limit as string),
+      // ⚡ Bolt Performance Optimization:
+      // Omit large JSON fields to reduce database payload size and network transfer
+      // when only basic topic info is needed for the opportunities list.
+      // Expected impact: Significant reduction in query latency and Node.js memory overhead.
+      omit: {
+        trendData: true,
+        competitionData: true,
+        linkedinData: true,
+        contentAngleMap: true,
+      },
     });
 
     res.json({ topics });
