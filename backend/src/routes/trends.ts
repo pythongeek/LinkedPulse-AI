@@ -226,6 +226,14 @@ router.get('/opportunities', authenticate, async (req, res) => {
       },
       orderBy: { opportunityScore: 'desc' },
       take: parseInt(limit as string),
+      // Optimization: Omit large JSON fields to reduce memory usage and network payload
+      // Impact: Significantly reduces over-fetching in topic lists
+      omit: {
+        trendData: true,
+        competitionData: true,
+        linkedinData: true,
+        contentAngleMap: true,
+      },
     });
 
     res.json({ topics });
