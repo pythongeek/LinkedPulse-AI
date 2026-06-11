@@ -104,6 +104,7 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { status, contentType, limit = '20', offset = '0' } = req.query;
 
+    // ⚡ Bolt: Prevent over-fetching large JSON/Text fields in list view
     const contents = await prisma.content.findMany({
       where: {
         userId: req.user!.id,
@@ -113,6 +114,18 @@ router.get('/', authenticate, async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string),
+      omit: {
+        body: true,
+        researchData: true,
+        linkedinOptimization: true,
+        competitiveAnalysis: true,
+        hookSuggestions: true,
+        outline: true,
+        sources: true,
+        slides: true,
+        topicSignal: true,
+        engagementActual: true,
+      },
     });
 
     const total = await prisma.content.count({
