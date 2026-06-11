@@ -218,6 +218,7 @@ router.get('/opportunities', authenticate, async (req, res) => {
   try {
     const { limit = '10', minScore = '60' } = req.query;
 
+    // ⚡ Bolt: Prevent over-fetching large JSON fields in list view
     const topics = await prisma.topic.findMany({
       where: {
         opportunityScore: {
@@ -226,6 +227,12 @@ router.get('/opportunities', authenticate, async (req, res) => {
       },
       orderBy: { opportunityScore: 'desc' },
       take: parseInt(limit as string),
+      omit: {
+        trendData: true,
+        competitionData: true,
+        linkedinData: true,
+        contentAngleMap: true,
+      },
     });
 
     res.json({ topics });
