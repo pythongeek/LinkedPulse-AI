@@ -17,6 +17,11 @@ router.get('/', authenticate, async (req, res) => {
     const personas = await prisma.persona.findMany({
       where: { userId: req.user!.id },
       orderBy: { createdAt: 'desc' },
+      omit: {
+        experienceVault: true,
+        visualDNA: true,
+        systemPrompt: true,
+      },
     });
 
     res.json({ personas });
