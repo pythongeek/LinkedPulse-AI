@@ -113,6 +113,17 @@ router.get('/', authenticate, async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string),
+      // ⚡ Bolt: Prevent over-fetching by omitting large JSON fields
+      // This significantly reduces memory usage and network payload for list operations
+      omit: {
+        outline: true,
+        researchData: true,
+        sources: true,
+        hookSuggestions: true,
+        linkedinOptimization: true,
+        competitiveAnalysis: true,
+        slides: true,
+      },
     });
 
     const total = await prisma.content.count({
