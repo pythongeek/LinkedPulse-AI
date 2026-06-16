@@ -1,0 +1,3 @@
+## 2023-10-27 - [Prisma JSON Fields Over-fetching in List Endpoints]
+**Learning:** [Prisma models in this repository (e.g., Content, Topic, Persona) contain large JSON fields (like researchData, linkedinOptimization). Fetching these fields in list endpoints (like `GET /api/content`) causes significant memory and network payload bottlenecks due to over-fetching.]
+**Action:** [Always use `omit` in `findMany` queries for list endpoints to easily exclude these large JSON fields (e.g. `omit: { researchData: true, linkedinOptimization: true, ... }`). This optimization is natively supported starting from Prisma ^6.2.1 and requires no explicit field inclusion setup.]

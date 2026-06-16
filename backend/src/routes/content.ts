@@ -104,6 +104,7 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { status, contentType, limit = '20', offset = '0' } = req.query;
 
+    // ⚡ Bolt: Exclude large JSON fields to reduce memory usage and network payload
     const contents = await prisma.content.findMany({
       where: {
         userId: req.user!.id,
@@ -113,6 +114,14 @@ router.get('/', authenticate, async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string),
+      omit: {
+        researchData: true,
+        linkedinOptimization: true,
+        competitiveAnalysis: true,
+        sources: true,
+        outline: true,
+        hookSuggestions: true,
+      },
     });
 
     const total = await prisma.content.count({
