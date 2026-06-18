@@ -110,6 +110,18 @@ router.get('/', authenticate, async (req, res) => {
         ...(status && { status: status as string }),
         ...(contentType && { contentType: contentType as string }),
       },
+      // ⚡ Bolt: Prevent over-fetching large JSON fields in list views
+      // This reduces memory usage and network payload for list views that don't need extensive details.
+      omit: {
+        researchData: true,
+        sources: true,
+        hookSuggestions: true,
+        linkedinOptimization: true,
+        competitiveAnalysis: true,
+        outline: true,
+        topicSignal: true,
+        engagementActual: true,
+      },
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string),
