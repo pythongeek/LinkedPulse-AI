@@ -306,7 +306,7 @@ router.get('/linkedin/login', authenticate, async (req, res) => {
   const redirectUri = `${backendUrl}/api/auth/linkedin/callback`;
   
   // Default to personal scopes for custom app unless scopes=all is explicitly requested
-  let scopeList = ['openid', 'profile', 'email', 'w_member_social'];
+  const scopeList = ['openid', 'profile', 'email', 'w_member_social'];
   const isCustomApp = !!session?.clientId;
   if (!isCustomApp || scopes === 'all') {
     scopeList.push('w_organization_social', 'r_organization_admin');
