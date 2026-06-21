@@ -110,6 +110,18 @@ router.get('/', authenticate, async (req, res) => {
         ...(status && { status: status as string }),
         ...(contentType && { contentType: contentType as string }),
       },
+      // ⚡ Bolt Optimization: Project only necessary fields for list view
+      // This prevents transferring large JSON blob fields (researchData, competitiveAnalysis, etc.)
+      select: {
+        id: true,
+        contentType: true,
+        title: true,
+        body: true,
+        status: true,
+        engagementPrediction: true,
+        createdAt: true,
+        updatedAt: true,
+      },
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string),
