@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AlertCircle, CheckCircle2, Info, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,84 +15,86 @@ export const PrePublishChecklist: React.FC<PrePublishChecklistProps> = ({
   charLimit,
   hashtagRange,
 }) => {
-  const count = content.length;
-  const paragraphs = content.split('\n\n').filter(Boolean);
+  const checks = useMemo(() => {
+    const count = content.length;
+    const paragraphs = content.split('\n\n').filter(Boolean);
 
-  // 1. Character limit check
-  const charLimitPass = count <= charLimit && count > 0;
+    // 1. Character limit check
+    const charLimitPass = count <= charLimit && count > 0;
 
-  // 2. Hashtags count check
-  const hashtags = content.match(/#\w+/g) || [];
-  const hashtagCount = hashtags.length;
-  const [minHash, maxHash] = hashtagRange;
-  const hashtagsPass = hashtagCount >= minHash && hashtagCount <= maxHash;
+    // 2. Hashtags count check
+    const hashtags = content.match(/#\w+/g) || [];
+    const hashtagCount = hashtags.length;
+    const [minHash, maxHash] = hashtagRange;
+    const hashtagsPass = hashtagCount >= minHash && hashtagCount <= maxHash;
 
-  // 3. Links check (only post/poll/carousel captions should avoid body links)
-  const hasLinksInBody = /https?:\/\/[^\s]+/.test(content);
-  const linksPass = contentType === 'article' ? true : !hasLinksInBody;
+    // 3. Links check (only post/poll/carousel captions should avoid body links)
+    const hasLinksInBody = /https?:\/\/[^\s]+/.test(content);
+    const linksPass = contentType === 'article' ? true : !hasLinksInBody;
 
-  // 4. Hook Window Sentence boundary check (first 210 chars)
-  const hookWindowText = content.substring(0, 210);
-  const hasGoodBoundary =
-    hookWindowText.includes('\n') ||
-    hookWindowText.includes('.') ||
-    hookWindowText.includes('!') ||
-    hookWindowText.includes('?');
-  const hookPass = count > 0 ? hasGoodBoundary : true;
+    // 4. Hook Window Sentence boundary check (first 210 chars)
+    const hookWindowText = content.substring(0, 210);
+    const hasGoodBoundary =
+      hookWindowText.includes('\n') ||
+      hookWindowText.includes('.') ||
+      hookWindowText.includes('!') ||
+      hookWindowText.includes('?');
+    const hookPass = count > 0 ? hasGoodBoundary : true;
 
-  // 5. Spacing check (line counts)
-  let spacingPass = true;
-  paragraphs.forEach((p) => {
-    const lines = p.split('\n').length;
-    if (lines > 3) spacingPass = false;
-  });
+    // 5. Spacing check (line counts)
+    let spacingPass = true;
+    paragraphs.forEach((p) => {
+      const lines = p.split('\n').length;
+      if (lines > 3) spacingPass = false;
+    });
 
-  // 6. CTA check
-  let ctaPass = false;
-  if (paragraphs.length > 0) {
-    const lastParagraph = paragraphs[paragraphs.length - 1].toLowerCase();
-    const ctaKeywords = ['comment', 'vote', 'link', 'check', 'share', 'follow', 'thoughts', 'dm', 'let me know', '?'];
-    ctaPass = ctaKeywords.some((word) => lastParagraph.includes(word));
-  }
+    // 6. CTA check
+    let ctaPass = false;
+    if (paragraphs.length > 0) {
+      const lastParagraph = paragraphs[paragraphs.length - 1].toLowerCase();
+      const ctaKeywords = ['comment', 'vote', 'link', 'check', 'share', 'follow', 'thoughts', 'dm', 'let me know', '?'];
+      ctaPass = ctaKeywords.some((word) => lastParagraph.includes(word));
+    }
 
-  const checks = [
-    {
-      id: 'char-limit',
-      label: `Character count within limit (${count.toLocaleString()} / ${charLimit.toLocaleString()})`,
-      status: charLimitPass ? 'pass' : 'fail',
-      errorMsg: 'Exceeds the maximum character limit allowed by LinkedIn.',
-    },
-    {
-      id: 'hashtag-count',
-      label: `Optimal hashtag count (${hashtagCount} used, target: ${minHash}-${maxHash})`,
-      status: hashtagsPass ? 'pass' : 'warn',
-      warnMsg: hashtagCount < minHash ? `Add ${minHash - hashtagCount} more hashtags.` : `Remove ${hashtagCount - maxHash} hashtags to boost distribution.`,
-    },
-    {
-      id: 'body-links',
-      label: 'No external links in post body',
-      status: linksPass ? 'pass' : 'fail',
-      errorMsg: 'Links in body suppress reach ~40%. Move the link to the First Comment tab.',
-    },
-    {
-      id: 'hook-fold',
-      label: 'Hook ends cleanly before see more line-fold',
-      status: hookPass ? 'pass' : 'warn',
-      warnMsg: 'Ensure the first sentence or curiosity gap fits within the 210 character fold.',
-    },
-    {
-      id: 'spacing',
-      label: 'Paragraphs are mobile-friendly (≤3 lines each)',
-      status: spacingPass ? 'pass' : 'warn',
-      warnMsg: 'Break up longer paragraphs to prevent readers from scrolling past walls of text.',
-    },
-    {
-      id: 'cta-exists',
-      label: 'Engagement prompt/CTA in final paragraph',
-      status: ctaPass ? 'pass' : 'warn',
-      warnMsg: 'Add a question or conversion instructions at the end to prompt comments.',
-    },
-  ];
+    return [
+      {
+        id: 'char-limit',
+        label: `Character count within limit (${count.toLocaleString()} / ${charLimit.toLocaleString()})`,
+        status: charLimitPass ? 'pass' : 'fail',
+        errorMsg: 'Exceeds the maximum character limit allowed by LinkedIn.',
+      },
+      {
+        id: 'hashtag-count',
+        label: `Optimal hashtag count (${hashtagCount} used, target: ${minHash}-${maxHash})`,
+        status: hashtagsPass ? 'pass' : 'warn',
+        warnMsg: hashtagCount < minHash ? `Add ${minHash - hashtagCount} more hashtags.` : `Remove ${hashtagCount - maxHash} hashtags to boost distribution.`,
+      },
+      {
+        id: 'body-links',
+        label: 'No external links in post body',
+        status: linksPass ? 'pass' : 'fail',
+        errorMsg: 'Links in body suppress reach ~40%. Move the link to the First Comment tab.',
+      },
+      {
+        id: 'hook-fold',
+        label: 'Hook ends cleanly before see more line-fold',
+        status: hookPass ? 'pass' : 'warn',
+        warnMsg: 'Ensure the first sentence or curiosity gap fits within the 210 character fold.',
+      },
+      {
+        id: 'spacing',
+        label: 'Paragraphs are mobile-friendly (≤3 lines each)',
+        status: spacingPass ? 'pass' : 'warn',
+        warnMsg: 'Break up longer paragraphs to prevent readers from scrolling past walls of text.',
+      },
+      {
+        id: 'cta-exists',
+        label: 'Engagement prompt/CTA in final paragraph',
+        status: ctaPass ? 'pass' : 'warn',
+        warnMsg: 'Add a question or conversion instructions at the end to prompt comments.',
+      },
+    ];
+  }, [content, contentType, charLimit, hashtagRange]);
 
   return (
     <div className="border border-border/80 bg-card rounded-xl p-5 space-y-4 text-foreground text-left shadow-inner">
