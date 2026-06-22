@@ -113,6 +113,16 @@ router.get('/', authenticate, async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string),
+      // Prevent over-fetching large JSON fields in list endpoints to reduce network and memory overhead
+      omit: {
+        outline: true,
+        researchData: true,
+        sources: true,
+        hookSuggestions: true,
+        linkedinOptimization: true,
+        competitiveAnalysis: true,
+        slides: true,
+      },
     });
 
     const total = await prisma.content.count({
