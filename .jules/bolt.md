@@ -1,0 +1,3 @@
+## 2024-05-24 - Prisma Omit Optimization for Large JSON Fields
+**Learning:** Prisma models in this repository (e.g., Content, Topic) contain massive JSON fields used for AI context (like `researchData`, `linkedinOptimization`, `trendData`). These fields can cause significant network bottlenecks and memory pressure if queried on list endpoints using `findMany`. Since Prisma ^6.2.1 natively supports `omit`, it is highly effective to exclude these fields on endpoints that do not strictly require them (like dashboard summaries and list views).
+**Action:** When working on list endpoints retrieving Content, Topic, or Persona records, verify frontend usage and proactively add `omit` clauses to `findMany` calls to exclude heavyweight JSON columns.
