@@ -14,9 +14,15 @@ const router = Router();
  */
 router.get('/', authenticate, async (req, res) => {
   try {
+    // ⚡ Bolt: [performance improvement] Omit large fields to prevent over-fetching and memory/network bottlenecks
     const personas = await prisma.persona.findMany({
       where: { userId: req.user!.id },
       orderBy: { createdAt: 'desc' },
+      omit: {
+        systemPrompt: true,
+        experienceVault: true,
+        visualDNA: true,
+      },
     });
 
     res.json({ personas });
