@@ -1,0 +1,3 @@
+## 2025-06-25 - Prevent Over-fetching in Prisma findMany
+**Learning:** Prisma models (like Content) can contain large JSON fields (like `researchData`, `outline`, `sources`, `hookSuggestions`, `linkedinOptimization`, `competitiveAnalysis`). For list queries like `/api/content`, fetching these unused large fields unnecessarily impacts database performance, memory, and network transmission.
+**Action:** Use Prisma's `omit` feature in `findMany` queries for list endpoints to avoid loading unused large JSON fields, after comprehensively checking the frontend to ensure these fields are truly unused.
