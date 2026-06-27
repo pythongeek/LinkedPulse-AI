@@ -104,11 +104,20 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { status, contentType, limit = '20', offset = '0' } = req.query;
 
+    // Optimization: Omit large unused JSON fields from the content list payload to reduce memory/network usage
     const contents = await prisma.content.findMany({
       where: {
         userId: req.user!.id,
         ...(status && { status: status as string }),
         ...(contentType && { contentType: contentType as string }),
+      },
+      omit: {
+        outline: true,
+        researchData: true,
+        sources: true,
+        hookSuggestions: true,
+        linkedinOptimization: true,
+        competitiveAnalysis: true,
       },
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
