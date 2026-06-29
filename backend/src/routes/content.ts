@@ -104,11 +104,23 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { status, contentType, limit = '20', offset = '0' } = req.query;
 
+    // ⚡ Bolt: Prevent over-fetching by omitting large JSON fields
     const contents = await prisma.content.findMany({
       where: {
         userId: req.user!.id,
         ...(status && { status: status as string }),
         ...(contentType && { contentType: contentType as string }),
+      },
+      omit: {
+        outline: true,
+        researchData: true,
+        sources: true,
+        hookSuggestions: true,
+        linkedinOptimization: true,
+        competitiveAnalysis: true,
+        slides: true,
+        pollOptions: true,
+        topicSignal: true,
       },
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
