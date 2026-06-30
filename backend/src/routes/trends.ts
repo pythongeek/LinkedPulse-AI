@@ -224,6 +224,13 @@ router.get('/opportunities', authenticate, async (req, res) => {
           gte: parseInt(minScore as string),
         },
       },
+      // ⚡ Bolt Performance Optimization: Omit large JSON/Text fields not needed in list views to prevent over-fetching
+      omit: {
+        trendData: true,
+        competitionData: true,
+        linkedinData: true,
+        contentAngleMap: true,
+      },
       orderBy: { opportunityScore: 'desc' },
       take: parseInt(limit as string),
     });
