@@ -110,6 +110,12 @@ router.get('/', authenticate, async (req, res) => {
         ...(status && { status: status as string }),
         ...(contentType && { contentType: contentType as string }),
       },
+      // ⚡ Bolt Performance Optimization: Omit large JSON/Text fields not needed in list views to prevent over-fetching
+      omit: {
+        researchData: true,
+        linkedinOptimization: true,
+        competitiveAnalysis: true,
+      },
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string),
