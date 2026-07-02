@@ -1,0 +1,3 @@
+## 2025-02-18 - Overfetching large JSON fields in Prisma list endpoints
+**Learning:** Prisma models (e.g., Content, Topic) in this codebase contain several very large JSON fields like `researchData` and `linkedinOptimization`. Doing `findMany` queries on list endpoints without filtering out these fields causes overfetching, inflating the API response size, causing massive network overhead and memory bottlenecks, even if the frontend doesn't render them all.
+**Action:** Always comprehensively trace the frontend usage of a list endpoint's payload, and apply the `omit` feature in Prisma's `findMany` queries for any large fields that are genuinely unused in list views (but are needed in detail views).
