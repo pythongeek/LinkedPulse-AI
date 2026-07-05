@@ -1,0 +1,3 @@
+## 2024-05-24 - Prisma Omit Over-fetching Optimization
+**Learning:** The Prisma `Content` model heavily utilizes large JSON fields (e.g., `researchData`, `competitiveAnalysis`, `linkedinOptimization`) and arrays (`slides`, `pollOptions`). Calling `findMany` on list endpoints without filtering out these fields creates severe memory and network bottlenecks as the dataset grows. Prisma ^6.2.1 natively supports `omit` to easily prevent this over-fetching.
+**Action:** When working on list endpoints using Prisma in this codebase, always use the `omit` feature (or `select`) to exclude large, unneeded JSON and text fields to prevent application slowdowns. Ensure you trace frontend usages before omitting to prevent regressions.
