@@ -113,6 +113,17 @@ router.get('/', authenticate, async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string),
+      // ⚡ Bolt: Prevent over-fetching large JSON fields in list view
+      omit: {
+        researchData: true,
+        linkedinOptimization: true,
+        competitiveAnalysis: true,
+        outline: true,
+        sources: true,
+        hookSuggestions: true,
+        slides: true,
+        pollOptions: true,
+      }
     });
 
     const total = await prisma.content.count({
