@@ -1,0 +1,3 @@
+## 2025-02-14 - Prisma Over-fetching in List Endpoints
+**Learning:** The `Content` model (and others like `Topic`, `Persona`) in this codebase contain several very large JSON and text fields (e.g., `researchData`, `competitiveAnalysis`, `hookSuggestions`). Calling `findMany` without a `select` or `omit` clause on list endpoints causes severe database and network bottlenecks due to over-fetching. Prisma ^6.2.1 natively supports `omit`.
+**Action:** Always use `omit` (or `select`) in `findMany` queries for list endpoints to exclude large JSON and text fields, significantly reducing payload sizes and memory usage.
